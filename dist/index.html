@@ -211,7 +211,8 @@ const CONDS=["15분 이내","23시 전","9시 이후","주말만"];
 const VLAB={O:"그냥 해도 돼",N:"알려만 줘",X:"먼저 물어봐줘"};
 const vOf=x=>!x?null:(x.v==="O"&&x.cond==="미리 말하면")?"N":x.v;
 const condOf=x=>!x||x.cond==="미리 말하면"?"":(x.cond||"");
-const ST={in:"깨어 있음",sleep:"자는 중",out:"깨어 있음"};
+const ST={in:"깨어 있음",sleep:"자는 중",out:"외출 중"};
+const NEXT_ST={in:"sleep",sleep:"out",out:"in"};
 const STAGE={direct:"바로 답",fyi:"알림",queued:"깨면 전달",delivered:"답 기다리는 중",replied:"답 옴",done:"끝",constraints:"각자 조건 확인",aligning:"대안 고르는 중",agreed:"합의",rule:"기숙사 규칙",blocked:"직접 얘기하기",cancelled:"그만둠"};
 const ROUTE={covered_by_agreement:"카드 범위 안",clarification_needed:"정보가 더 필요함",coordination_needed:"상대에게 확인 필요",rule:"기숙사 규칙"};
 const DAY_LIMIT=20,WAIT_MS=10*60*1000,MAX_ROUNDS=3;
@@ -228,7 +229,7 @@ const nm=s=>esc((S.room&&S.room.names&&S.room.names[s])||(s===S.seat?"나":"룸�
 const joined=s=>!!S.room?.members?.[s];
 // 모델이 만든 문장에 남은 A, B 글자를 이름으로 (예: "A가 스터디룸에서" -> "하늘이 스터디룸에서"는 josa()가 마저 고친다)
 const nameT=t=>String(t??"").replace(/(^|[^A-Za-z0-9])([AB])(?=[가-힣\s.,!?:)]|$)/g,(m,pre,x)=>pre+((S.room?.names?.[x])||(x===S.seat?"나":"룸메")));
-const toneKey=s=>S.room?.tones?.[s]||"soft";
+const toneKey=s=>"soft"; // 듣는 말투 설정은 뺐다. 받는 사람 말투는 늘 부드럽게
 const tone=s=>TONES[toneKey(s)]||null;
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 const now=()=>new Date();
@@ -762,10 +763,11 @@ function homeView(){
     body=`${invite}${asleep}${hold?`<div class="why" style="margin:0 0 10px">${esc(hold[0])} <button class="lnk" data-act="go" data-arg="thread|${hold[1]}">편지 보기</button></div>`:""}<label class="say" for="sayT">${hold?"다른 할 말이 있어요?":"무슨 일이에요?"}</label><div class="row" style="margin-top:0"><input id="sayT" class="input" maxlength="120" placeholder="예: 지금 방에서 통화해도 돼?" style="flex:3"><button class="btn main px4" data-act="say">말하기</button></div>${unsorted?`<button class="lnk" data-act="toCards">카드 먼저 정하기</button>`:""}`}
   const zMe=st[me]==="sleep",zO=joined(o)&&st[o]==="sleep";
   if(pose==="stand"&&!f&&(zMe||zO)){pose="sleep";if(zMe&&zO){mx=196;my=360}else{const who=zMe?me:o;mx=who==="A"?74:320;my=318}}
+  if(pose==="stand"&&!f&&joined(o)&&st[o]==="out"&&!zMe){mx=196;my=470}
   const bang=unsorted&&!f&&pose!=="sleep"?`<button class="bang" data-act="toCards" aria-label="안 정한 카드 ${unsorted}장" style="left:${mx+22}px;top:${my-92}px">!</button>`:"";
   const eh=pose==="sleep"?52:80;
   return `<div class="scene"><div class="stage"><div class="world" data-focus="${my}"><div class="room t-${zMe?"night":dayPart()}" role="img" aria-label="${zMe?"불을 끈 ":""}우리 방. 왼쪽 남색 침대는 ${nm("A")}, 오른쪽 초록 침대는 ${nm("B")}. ${pose==="sleep"?"요정이 "+(zMe&&zO?"방 가운데서":(zMe?"내":nm(o))+" 침대 옆에서")+" 같이 자고 있어요.":""}" style="width:392px;height:588px"></div>${elfSVG(elfKey(),pose,`요정 ${elf().name}`,4,`left:${mx}px;top:${my}px;transform:translate(-50%,-100%)`)}${bang}</div>
-<div class="hud"><span class="chip px4">${joined(o)?`${nm(o)} ${ST[st[o]]||""}`:"룸메 아직 안 들어옴"}</span><span style="display:flex;gap:6px"><button class="chip light px4" data-act="setSt" data-arg="${st[me]==="sleep"?"in":"sleep"}" aria-label="내 상태 바꾸기, 지금 ${ST[st[me]]||""}">나 ${ST[st[me]]||""}</button><button class="chip light px4" data-act="go" data-arg="me" aria-label="설정">⚙</button></span></div></div>${dialog(body)}</div>`;
+<div class="hud"><span class="chip px4">${joined(o)?`${nm(o)} ${ST[st[o]]||""}`:"룸메 아직 안 들어옴"}</span><span style="display:flex;gap:6px"><button class="chip light px4" data-act="setSt" data-arg="${NEXT_ST[st[me]]||"sleep"}" aria-label="내 상태 바꾸기, 지금 ${ST[st[me]]||"깨어 있음"}">나 ${ST[st[me]]||"깨어 있음"}</button><button class="chip light px4" data-act="go" data-arg="me" aria-label="설정">⚙</button></span></div></div>${dialog(body)}</div>`;
 }
 
 /* ---------- 화면: 편지 ---------- */
@@ -906,11 +908,9 @@ ${c.proposal?`<p class="sub" style="margin-top:12px">${esc(elf().name)}가 제�
 
 /* ---------- 화면: 설정, 시작 ---------- */
 function meView(){
-  const st=S.room?.status?.[S.seat]==="sleep"?"sleep":"in",tk=toneKey(S.seat);
+  const st=["sleep","out"].includes(S.room?.status?.[S.seat])?S.room.status[S.seat]:"in";
   return `<div class="page">${header("설정",1)}
-<h2 class="dh">듣는 말투</h2>
-<div class="list">${["soft","direct"].map(k=>`<button class="mini item ${tk===k?"sel":""}" data-act="setTone" data-arg="${k}" aria-pressed="${tk===k}"><span style="text-align:left"><b class="dh" style="font-size:16px;font-weight:400">${TONES[k].label}</b><br><span style="font-size:14px;font-family:var(--fs)">"${esc(PREVIEW[k])}"</span></span>${tk===k?`<span class="dh state" style="color:var(--elf)">지금</span>`:""}</button>`).join("")}</div>
-<h2 class="dh">내 상태</h2><div class="seg">${[["in","깨어 있음"],["sleep","자는 중"]].map(([k,v])=>`<button class="segb ${st===k?"on":""}" data-act="setSt" data-arg="${k}" aria-pressed="${st===k}">${v}</button>`).join("")}</div>
+<h2 class="dh">내 상태</h2><div class="seg">${[["in","깨어 있음"],["sleep","자는 중"],["out","외출 중"]].map(([k,v])=>`<button class="segb ${st===k?"on":""}" data-act="setSt" data-arg="${k}" aria-pressed="${st===k}">${v}</button>`).join("")}</div>
 <h2 class="dh">내 이름</h2><div class="row" style="margin-top:0"><input id="nameS" class="input" maxlength="8" style="flex:2" value="${esc(S.room?.names?.[S.seat]||"")}" placeholder="예: 현지"><button class="btn px4" data-act="saveName">저장</button></div><h2 class="dh">방</h2><div class="list"><div class="mini"><span>방 코드 </span><b class="dh" style="font-size:16px;font-weight:400;letter-spacing:.08em">${esc(S.code)}</b></div></div>
 <div class="col">${S.room?.demo?`<button class="btn px4" data-act="switchSeat">${nm(other())} 화면으로 보기</button>`:""}<button class="btn px4" data-act="export">기록 내보내기</button>${S.confirmLeave?`<div class="why" style="margin:0" role="alert">방을 나가도 방과 편지는 그대로 있어요. 다시 들어오려면 방 코드 <b class="dh" style="color:var(--ink);letter-spacing:.08em">${esc(S.code)}</b>가 필요해요. 이 기기에서는 첫 화면에 남겨둘게요.<div class="row"><button class="btn px4" data-act="leaveNo">취소</button><button class="btn main px4" data-act="leave">나가기</button></div></div>`:`<button class="btn px4" data-act="leaveAsk">방 나가기</button>`}</div>
 </div>`;
@@ -976,7 +976,7 @@ document.addEventListener("click",async e=>{
   else if(a==="back"){const p=S.prev&&!(S.prev.name===S.route.name&&S.prev.id===S.route.id)?S.prev:{name:S.tab};S.prev=null;go(p.name,p.id)}
   else if(a==="toCards"){go(S.cards.some(c=>!c[S.seat]&&!c.locked)?"sort":"cards")}
   else if(a==="cf"){S.cf=arg;render()}
-  else if(a==="cycle"){const cur=S.room?.status?.[S.seat]||"in";await setStatus(cur==="in"?"sleep":"in")}
+  else if(a==="cycle"){const cur=S.room?.status?.[S.seat]||"in";await setStatus(NEXT_ST[cur]||"in")}
   else if(a==="setSt"){await setStatus(arg)}
   else if(a==="unpick"){const p={...(S.room?.fairyPick||{})};delete p[S.seat];await roomRef().update({fairyPick:p})}
   else if(a==="refairy"){await roomRef().update({elf:null,fairyPick:{},fairyMiss:0});go("home")}
