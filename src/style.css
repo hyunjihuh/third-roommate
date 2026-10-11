@@ -188,3 +188,7 @@ div.opt.on{box-shadow:inset 0 0 0 2.5px var(--line)}
 .prop.dim{filter:brightness(.7) saturate(.85)}
 .elf .acc,.lookimg .acc{position:absolute;inset:0;display:block}
 .elf{overflow:visible}
+.talkhit{position:absolute;width:76px;height:100px;transform:translate(-50%,-100%);border:none;background:transparent;cursor:pointer;z-index:2;border-radius:20px}
+.talkhit:focus-visible{outline:3px solid var(--elf)}
+.talkhint{position:absolute;transform:translate(-50%,-100%);padding:4px 10px;border-radius:999px;background:var(--paper);box-shadow:inset 0 0 0 2px var(--line);font-family:var(--ft);font-size:13px;white-space:nowrap;pointer-events:none;z-index:2}
+@media (prefers-reduced-motion:no-preference){.talkhint{animation:hop 2s ease-in-out infinite}}

@@ -30,6 +30,7 @@ async def main():
       async def say(txt):
         await act('go','home')
         if await has('[data-act="seenAgr"]'): await act('seenAgr')
+        if not await has('#sayT'): await act('talk')
         await pg.fill('#sayT',txt);await act('say');await pg.wait_for_timeout(600)
       async def has(sel): return await pg.query_selector(sel) is not None
       async def check(label,must=(),mustnot=(),sel='#app',cond=None):
@@ -67,7 +68,7 @@ async def main():
       await check('깨면: 요정도 깨서 편지를 들고 옴',mustnot=['나는 자는 중이에요'],cond=not await has('.sleeper'))
       # 쌓인 편지 처리: 과외 편지가 나올 때까지
       for _ in range(4):
-        if await has('#noteT'):
+        if await has('[data-act="rOk"]'):
           txt=await pg.inner_text('.dialog')
           if '과외' in txt: break
           await act('rOk');await pg.wait_for_timeout(500)
@@ -75,7 +76,8 @@ async def main():
         elif await has('[data-act="fyiOk"]'): await act('fyiOk');await pg.wait_for_timeout(400)
         else: break
       await shot('home_B_letter2')
-      await pg.fill('#noteT','9시 이후면 괜찮아');await act('rHard');await pg.wait_for_timeout(400);await shot('B_after_reply')
+      await act('rHard');await check('어렵다고 고르면 이유 칸이 열림',must=['이유를 한마디'])
+      await pg.fill('#noteT','9시 이후면 괜찮아');await act('rSend');await pg.wait_for_timeout(400);await shot('B_after_reply')
       await sw();await shot('A_reply')
       await check('A 대화창: 전해 들은 말투',must=['어렵대요'],sel='.dialog')
       await pg.click('[data-act="align"]');await pg.wait_for_timeout(600);await shot('A_constraints')
@@ -85,7 +87,7 @@ async def main():
       await pg.click('[data-act="consSubmit"]');await pg.wait_for_timeout(500);await shot('A_cons_done')
       await sw();await shot('B_home_cons')
       for _ in range(3):
-        if await has('#noteT'):
+        if await has('[data-act="rOk"]'):
           await act('rOk');await pg.wait_for_timeout(500)
           if await has('[data-act="ok"]'): await act('ok')
           if await has('[data-act="toCards"].choice, .dialog [data-act="ok"]'): pass
