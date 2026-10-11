@@ -32,11 +32,10 @@ const STARTER=[["개인 공간","내 책상이나 침대 쓰기","laptop","잠�
 const RULES=[["기숙사 규칙","외부인 방에서 자고 가기"],["기숙사 규칙","자정 이후 큰 소리 내기"]];
 const DEMO={0:[["O",""],["X",""]],1:[["X",""],["X",""]],2:[["O","밤 11시 전에만"],["O","15분 안으로만"]],3:[["O","먹고 나서 환기랑 정리만 해줘"],["O",""]],4:[["X",""],null],5:[["O",""],["O","쓰고 제자리에 둬줘"]]};
 // 카드 답 두 가지. O = 그냥 해도 돼, X = 먼저 물어봐줘. 조건은 자유롭게 적는 한 줄. 예전 데이터의 N(알려만 줘)과 "미리 말하면"은 O로 읽는다
-// 카드를 꺼두면(off_A / off_B) 정하지 않은 것처럼 보라가 물어본다
 const VLAB={O:"그냥 해도 돼",X:"먼저 물어봐줘"};
 const vOf=x=>!x?null:x.v==="N"?"O":x.v;
 const condOf=x=>!x||x.cond==="미리 말하면"?"":(x.cond||"");
-const ansOf=(c,s)=>c&&!c["off_"+s]?c[s]:null;
+const ansOf=(c,s)=>!c?null:c["off_"+s]&&c[s]?{v:"X",cond:""}:c[s]; // 카드 끄기는 뺐다. 예전에 꺼둔 카드는 "먼저 물어봐줘"로 읽는다
 const ST={in:"깨어 있음",sleep:"자는 중",out:"외출 중"};
 const NEXT_ST={in:"sleep",sleep:"out",out:"in"};
 const STAGE={direct:"바로 답",fyi:"알림",queued:"깨면 전달",delivered:"답 기다리는 중",replied:"답 옴",done:"끝",constraints:"각자 조건 확인",aligning:"대안 고르는 중",agreed:"합의",rule:"기숙사 규칙",blocked:"합의 못 함",cancelled:"그만둠"};
@@ -534,7 +533,7 @@ async function reviewAgr(a,mode){
   else if(mode==="end")await ref.update({state:"off",endedAt:Date.now(),endedBy:S.seat});
   else{const n=await db.collection(`rooms/${S.code}/requests`).add({from:S.seat,to:other(),kind:"review",draft:"같이 만든 카드 다시 맞추기: "+a.text,facts:[],ts:Date.now(),stage:"constraints",agreementId:a.id,constraints:{},consDone:{},round:1,version:0,picks:{},translations:{}});go("thread",n.id)}
 }
-async function sortCard(c,v,cond){await db.doc(`rooms/${S.code}/cards/${c.id}`).update({[S.seat]:{v,cond:cond||""},...(c.redo===S.seat?{editedBy:S.seat,editedAt:Date.now(),editKind:"answer",redo:null}:{})});const f={...c,[S.seat]:{v}};if(c.origin==="proposal"&&f.A&&f.B)await db.doc(`rooms/${S.code}/cards/${c.id}`).update({origin:"from_request"})}
+async function sortCard(c,v,cond){await db.doc(`rooms/${S.code}/cards/${c.id}`).update({[S.seat]:{v,cond:cond||""},["off_"+S.seat]:null,...(c.redo===S.seat?{editedBy:S.seat,editedAt:Date.now(),editKind:"answer",redo:null}:{})});const f={...c,[S.seat]:{v}};if(c.origin==="proposal"&&f.A&&f.B)await db.doc(`rooms/${S.code}/cards/${c.id}`).update({origin:"from_request"})}
 async function resetCard(c){await db.doc(`rooms/${S.code}/cards/${c.id}`).update({[S.seat]:null,redo:S.seat})}
 async function exportLog(){
   const d={room:S.code,exportedAt:new Date().toISOString(),note:"비공개 원문, 공유하지 않은 조건은 저장하지 않아요.",fairy:S.room?.elf,tones:S.room?.tones,cards:S.cards.map(c=>({id:c.id,title:c.title,cat:c.cat,origin:c.origin,A:c.A,B:c.B,proposal:c.proposal})),requests:S.reqs.map(r=>({id:r.id,from:r.from,to:r.to,kind:r.kind,approved_text:r.draft,facts:r.facts,stage:r.stage,c1:r.c1,delivered_text:r.translations,reply:r.reply,shared_constraints:r.constraints,options:r.options,version:r.version,picks:r.picks,ts:new Date(r.ts).toISOString()})),agreements:S.agrs.map(a=>({text:a.text,option:a.option,version:a.version,adjust:a.adjust,state:a.state,ts:new Date(a.ts).toISOString()}))};
@@ -693,7 +692,7 @@ function threadView(id){
 
 /* ---------- 화면: 카드 ---------- */
 function cardHTML(c){const col=CATS[c.cat]||"#B9A6F5";return `<div class="bigcard px6"><div><div class="ttag" style="background:${col};display:flex;justify-content:space-between"><span>${esc(c.cat)}</span>${c.origin==="proposal"?"<span>제안</span>":""}</div>${art(c)}<div style="padding:16px 14px 16px;box-shadow:inset 0 3px 0 var(--line)"><p style="margin:0;font-family:var(--ft);font-size:24px;line-height:1.35;text-align:center">${esc(c.title)}</p>${c.flavor&&!c.locked?`<p class="s12" style="margin:8px 0 0;color:var(--muted);text-align:center;line-height:1.6">${esc(c.flavor)}</p>`:""}</div></div></div>`}
-function stateOf(c){if(c.locked)return["기숙사 규칙","var(--muted)"];const m=c[S.seat];if(!m)return["아직 안 정함","var(--muted)"];if(c["off_"+S.seat])return["꺼둠","var(--muted)"];const v=vOf(m);return[VLAB[v],v==="O"?"#1B7559":"#B3261E"]}
+function stateOf(c){if(c.locked)return["기숙사 규칙","var(--muted)"];const m=ansOf(c,S.seat);if(!m)return["아직 안 정함","var(--muted)"];const v=vOf(m);return[VLAB[v],v==="O"?"#1B7559":"#B3261E"]}
 const pickTxt=x=>x?`${VLAB[vOf(x)]}${condOf(x)?", "+condOf(x):""}`:"";
 const evTitle=id=>String(id).startsWith("g_")?(S.agrs.find(a=>"g_"+a.id===id)?.text||"같이 만든 카드"):(S.cards.find(c=>c.id===id)?.title||id);
 const evGo=id=>String(id).startsWith("g_")?"agr|"+String(id).slice(2):"card|"+id;
@@ -719,8 +718,7 @@ function artByTitle(t){t=String(t||"");const R=[[/통화|전화/,1],[/드라이|
 function art(c){const n=artNum(c.art)||ART_ID[c.id]||artByTitle(c.title)||ART_CAT[c.cat]||9;return `<span class="art art-${n}"></span>`}
 function tileState(c){
   if(c.locked)return["기숙사 규칙","#E3D5B5"];
-  const m=c[S.seat];if(!m)return["아직 안 정함","#E3D5B5"];
-  if(c["off_"+S.seat])return["꺼둠","#E3D5B5"];
+  const m=ansOf(c,S.seat);if(!m)return["아직 안 정함","#E3D5B5"];
   const v=vOf(m);return [VLAB[v]+(condOf(m)?" · 조건 있음":""),v==="O"?"#B7E3A0":"#F7B9A5"];
 }
 function tile(c){
@@ -748,10 +746,10 @@ function sortView(){
 }
 function cardDetail(id){
   const c=S.cards.find(x=>x.id===id);if(!c)return `<div class="page">${header("카드",1)}<p class="sub">이 카드를 찾을 수 없어요.</p></div>`;
-  const me=S.seat,o=other(),mine=c[me],theirs=c[o],both=mine&&theirs;
+  const me=S.seat,o=other(),mine=ansOf(c,me),theirs=c[o],both=mine&&theirs;
   if(c.locked)return `<div class="page">${header("카드",1)}<div style="max-width:200px;margin:0 auto 12px">${cardHTML(c)}</div><p class="say" style="text-align:center">기숙사 규칙이라 둘이 바꿀 수 없어요.</p></div>`;
-  const mv=vOf(mine),off=!!c["off_"+me];
-  const result=off?`꺼둔 카드예요. ${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 나한테 먼저 물어봐요.`:!mine?`내가 정하기 전엔 ${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 나한테 물어봐요.`:mv==="O"?`${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 "${nm(o)}가 미리 괜찮다고 해둔 일"이라고 바로 답해요.`:`${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 나한테 먼저 물어봐요.`;
+  const mv=vOf(mine);
+  const result=!mine?`내가 정하기 전엔 ${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 나한테 물어봐요.`:mv==="O"?`${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 "${nm(o)}가 미리 괜찮다고 해둔 일"이라고 바로 답해요.`:`${nm(o)}가 이걸 하려고 하면 ${esc(elf().name)}가 나한테 먼저 물어봐요.`;
   const theirTxt=!theirs?`아직 안 정했어요. 그전엔 ${esc(elf().name)}가 ${nm(o)}에게 물어봐요.`:`정해뒀어요. 내가 하려고 하면 ${esc(elf().name)}가 그 기준대로 답해줘요.`;
   return `<div class="page">${header("카드",1)}<div style="max-width:200px;margin:0 auto 12px">${cardHTML(c)}</div>
 <h2 class="dh" style="margin-top:0">${nm(o)}가 이걸 하고 싶을 때, 나는</h2>
@@ -848,7 +846,6 @@ document.addEventListener("click",async e=>{
   else if(a==="fillSay"){const el=$("#sayT");if(el){el.value=arg;el.focus()}}
   else if(a==="say"){const t=($("#sayT")?.value||"").trim();if(!t){$("#sayT")?.focus();return}b.disabled=true;$("#sayT").value="";await submitSay(t)}
   else if(a==="setCond"){const c=S.cards.find(x=>x.id===arg);const t=($("#condE")?.value||"").trim().slice(0,40);if(c?.[S.seat]){await sortCard({...c,redo:S.seat},vOf(c[S.seat]),t);announce("조건을 저장했어요")}}
-  else if(a==="toggleCard"){const c=S.cards.find(x=>x.id===arg);if(c){const off=!c["off_"+S.seat];await db.doc(`rooms/${S.code}/cards/${c.id}`).update({["off_"+S.seat]:off,editedBy:S.seat,editedAt:Date.now(),editKind:off?"off":"on"});announce(off?"카드를 껐어요":"카드를 켰어요")}}
   else if(a==="endDemo"){leave()}
   else if(a==="wear"){const on=!S.room?.wear?.[arg];await mergeIn(roomRef(),{wear:{[arg]:on}});announce(on?"걸쳤어요":"벗었어요")}
   else if(a==="cancel"||a==="ok"){S.flow=null;render()}
