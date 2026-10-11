@@ -844,8 +844,8 @@ function render(){
   layoutWorld();
 }
 function layoutWorld(){const st=document.querySelector(".stage"),w=document.querySelector(".world");if(!st||!w)return;
-  // 방은 늘 같은 크기(무대 전체를 채우는 크기)로 두고, 대화창은 그 위에 겹친다. 대화창이 길어지면 방을 위로 밀어 보라가 보이게만 한다
-  const W=st.clientWidth,H=st.clientHeight,dw=document.querySelector(".dwrap"),vis=Math.max(120,H-((dw&&dw.offsetHeight)||0)+18),k=Math.max(W/392,H/588),full=588*k,fy=(+w.dataset.focus||340)*k;const off=Math.max(0,Math.min(full-vis,fy+24-vis)),ox=(W-392*k)/2;w.style.transform=`translate(${ox}px,${-off}px) scale(${k})`}
+  // 방은 늘 가로에 딱 맞는 크기로 두고(양옆이 안 잘리게), 대화창은 그 위에 겹친다. 대화창이 길어지면 방을 위로 밀어 보라가 보이게만 한다
+  const W=st.clientWidth,H=st.clientHeight,dw=document.querySelector(".dwrap"),vis=Math.max(120,H-((dw&&dw.offsetHeight)||0)+18),k=W/392,full=588*k,fy=(+w.dataset.focus||340)*k;const off=Math.max(0,Math.min(full-vis,fy+24-vis)),ox=(W-392*k)/2;w.style.transform=`translate(${ox}px,${-off}px) scale(${k})`}
 
 /* ---------- 이벤트 ---------- */
 document.addEventListener("click",async e=>{
