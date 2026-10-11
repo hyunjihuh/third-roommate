@@ -1,9 +1,18 @@
 const IMG=__IMG__;
 const dayPart=()=>{const h=now().getHours();return h>=6&&h<16?"morning":h>=16&&h<21?"evening":"night"};
 const ELF_R={stand:142/200,letter:132/200,sleep:190/130,wobble:160/200,sniff:173/200,bow:145/200};
-(()=>{const st=document.createElement("style");st.textContent=`.room{background:url(${IMG.room}) 0 0/100% 100% no-repeat}`+["morning","night"].filter(k=>IMG["room_"+k]).map(k=>`.room.t-${k}{background-image:url(${IMG["room_"+k]})}`).join("")+Object.keys(ELF_R).map(k=>`.elf-${k}{background:url(${IMG["elf_"+k]}) center/contain no-repeat}`).join("")+`.letter::after{background:url(${IMG.stamp}) center/contain no-repeat}`+Array.from({length:18},(_,i)=>i+1).filter(n=>IMG["card"+n]).map(n=>`.art-${n}{background:url(${IMG["card"+n]}) center/cover no-repeat}`).join("");document.head.appendChild(st)})();
+(()=>{const st=document.createElement("style");st.textContent=`.room{background:url(${IMG.room}) 0 0/100% 100% no-repeat}`+["morning","night"].filter(k=>IMG["room_"+k]).map(k=>`.room.t-${k}{background-image:url(${IMG["room_"+k]})}`).join("")+Object.keys(ELF_R).map(k=>`.elf-${k}{background:url(${IMG["elf_"+k]}) center/contain no-repeat}`).join("")+`.letter::after{background:url(${IMG.stamp}) center/contain no-repeat}`+[1,2,3,4,5].filter(n=>IMG["look"+n]).map(n=>`.elf-look${n}{background:url(${IMG["look"+n]}) center/contain no-repeat}`).join("")+["sleepA","sleepB","slipA","slipB"].filter(k=>IMG["prop_"+k]).map(k=>`.prop-${k}{background:url(${IMG["prop_"+k]}) center/contain no-repeat}`).join("")+Array.from({length:18},(_,i)=>i+1).filter(n=>IMG["card"+n]).map(n=>`.art-${n}{background:url(${IMG["card"+n]}) center/cover no-repeat}`).join("");document.head.appendChild(st)})();
 const ICONS=__ICONS__;
 const ELF_MAPS=__MAPS__;
+// 보라 꾸미기. 방에 하나뿐인 보라라 둘이 같이 본다(room.look). 쓰면서 하나씩 열린다
+const LOOKS=[
+  {n:0,name:"기본",how:"처음부터",ok:()=>true},
+  {n:1,name:"잎 네 장",how:"편지 3통 주고받기",ok:()=>S.reqs.filter(r=>!["rule","cancelled"].includes(r.stage)).length>=3},
+  {n:2,name:"꽃봉오리",how:"같이 만든 카드 1장",ok:()=>S.agrs.length>=1},
+  {n:3,name:"꽃 핌",how:"같이 만든 카드 1주 해보고 계속하기",ok:()=>S.agrs.some(a=>a.reviewedAt)},
+  {n:4,name:"별 핀",how:"내 카드 6장 다 정하기",ok:()=>S.cards.filter(c=>!c.locked&&c.origin==="starter").every(c=>c[S.seat])},
+  {n:5,name:"목도리",how:"룸메가 방에 들어오기",ok:()=>joined(other())}];
+const lookN=()=>{const n=+(S.room?.look||0);return IMG["look"+n]&&LOOKS[n]?.ok()?n:0};
 const ELVES={bora:{name:"보라",map:"모자 요정"},monggeul:{name:"몽글",map:"소녀 요정"},ttobak:{name:"또박",map:"앞치마 요정"},mungge:{name:"뭉게",map:"구름 요정"}};
 const TONES={
   soft:{label:"부드럽게",desc:"'혹시', '괜찮으면'을 넣어 조심스럽게",style:"부드럽고 조심스럽게. '혹시', '괜찮으면' 같은 쿠션어를 한 번 쓴다."},
@@ -537,8 +546,9 @@ async function exportLog(){
 
 /* ---------- 그림 ---------- */
 function elfSVG(key,pose,label,cell,style){
-  const k=ELF_R[pose]?pose:"stand",h=k==="sleep"?cell*13:cell*20;
-  return `<div class="elf elf-${k}" role="img" aria-label="${esc(label)}" style="height:${h}px;width:${Math.round(h*ELF_R[k])}px;${style||""}"></div>`;
+  const k=ELF_R[pose]?pose:"stand",ln=k==="stand"?lookN():0,h=(k==="sleep"?cell*13:cell*20)*(ln?400/358:1);
+  // 꾸민 그림은 284x400 캔버스에 몸이 358 높이로 들어 있어 기본 그림과 몸 크기를 맞춘다
+  return `<div class="elf elf-${ln?"look"+ln:k}" role="img" aria-label="${esc(label)}" style="height:${Math.round(h)}px;width:${Math.round(h*(ln?284/400:ELF_R[k]))}px;${style||""}"></div>`;
 }
 function iconSVG(name,bg){const r=ICONS[name]||ICONS.laptop;return `<svg viewBox="0 0 16 12" style="width:100%;height:auto;display:block" shape-rendering="crispEdges" aria-hidden="true"><rect width="16" height="12" fill="${bg}"/>${r.map(a=>`<rect x="${a[0]}" y="${a[1]}" width="${a[2]}" height="${a[3]}" fill="${a[4]}"/>`).join("")}</svg>`}
 function dialog(html){return `<div class="dwrap"><div class="nametag px3">${esc(elf().name)}</div><div class="dialog"><div class="dialog-in" aria-live="polite">${html}</div></div></div>`}
@@ -547,8 +557,8 @@ const factChips=f=>(f&&f.length)?`<div class="chips" aria-label="꼭 전해야 �
 const replyLine=(seat,choice,note,kind)=>(((kind==="ask"?REPLY_LINE_ASK:REPLY_LINE)[toneKey(seat)]||REPLY_LINE.soft)[choice]||"")+(note?`\n"${note}"`:"");
 const replySelf=(kind,choice,note)=>(REPLY_SELF[kind==="ask"?"ask":"do"][choice]||"")+"."+(note?`\n${note}`:"");
 const replyBtns=(r,col)=>{const R=REPLY_SELF[r.kind==="ask"?"ask":"do"];return [["rOk",R.ok],["rCond",R.cond],["rHard",R.hard]].map(([a,l],i)=>col?`<button class="btn ${i===0?"main ":""}px4" data-act="${a}" data-arg="${r.id}">${l}</button>`:[a,l,r.id])};
-function header(title,back){return `<div class="hdr">${back?`<button class="hbtn px3" data-act="back" aria-label="뒤로">←</button>`:""}<h1 class="ttl" style="margin:0;flex:1">${esc(title)}</h1>${back?"":`<button class="hbtn px3" data-act="go" data-arg="me" aria-label="설정">⚙</button>`}</div>`}
-function go(name,id){S.confirmLeave=false;if(name==="notes"&&S.code){S.noteSeenAt=+(ls(noteKey())||0);ls(noteKey(),String(Date.now()))}if(S.route.name!==name||S.route.id!==id)S.prev=S.route;S.route={name,id};if(["home","letters","cards"].includes(name))S.tab=name;if(name==="sort")S.tab="cards";S.flow=null;render();const h=$(".page h1");if(h){h.setAttribute("tabindex","-1");h.focus()}}
+function header(title,back){return `<div class="hdr">${back?`<button class="hbtn px3" data-act="back" aria-label="뒤로">←</button>`:""}<h1 class="ttl" style="margin:0;flex:1">${esc(title)}</h1></div>`}
+function go(name,id){S.confirmLeave=false;if(name==="notes"&&S.code){S.noteSeenAt=+(ls(noteKey())||0);ls(noteKey(),String(Date.now()))}if(S.route.name!==name||S.route.id!==id)S.prev=S.route;S.route={name,id};if(["home","letters","cards","me"].includes(name))S.tab=name;if(name==="sort")S.tab="cards";S.flow=null;render();const h=$(".page h1");if(h){h.setAttribute("tabindex","-1");h.focus()}}
 
 /* ---------- 할 일 찾기 ---------- */
 function todoFor(r){const me=S.seat;
@@ -605,14 +615,15 @@ function homeView(){
     body=`${invite}${asleep}${hold?`<div class="why" style="margin:0 0 10px">${esc(hold[0])} <button class="lnk" data-act="go" data-arg="thread|${hold[1]}">편지 보기</button></div>`:""}<label class="say" for="sayT">${hold?"다른 할 말이 있어요?":"무슨 일이에요?"}</label><div class="row" style="margin-top:0"><input id="sayT" class="input" maxlength="120" placeholder="예: 지금 방에서 통화해도 돼?" style="flex:3"><button class="btn main px4" data-act="say">말하기</button></div>${unsorted?`<button class="lnk" data-act="toCards">카드 먼저 정하기</button>`:""}`}
   // 보라는 자지 않는다. 자는 사람은 그 사람 침대 이불이 불룩하고 z가 뜬다. 외출 중이면 그 사람 책상에 팻말
   const zMe=st[me]==="sleep",zO=joined(o)&&st[o]==="sleep",outO=joined(o)&&st[o]==="out",outMe=st[me]==="out";
-  const BED={A:[66,262],B:[326,262]},DESK={A:[100,122],B:[290,122]};
+  // GPT로 뽑은 이불(사람이 덮고 자는 모습)과 슬리퍼 그림을 방 위에 얹는다. 그림이 없으면 코드로 그린 그림자와 팻말
+  const BED={A:[66,262],B:[326,262]},DESK={A:[100,122],B:[290,122]},BLANKET={A:[8,192,120,181],B:[265,192,120,181]},SLIP={A:[152,448],B:[212,448]};
   const props=["A","B"].map(x=>{const s_=x===me?(zMe?"sleep":outMe?"out":""):(zO?"sleep":outO?"out":"");
-    if(s_==="sleep")return `<div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]}px" aria-hidden="true"><span class="lump"></span><span class="zz">z<b>z</b><i>Z</i></span></div>`;
-    if(s_==="out")return `<div class="outsign" style="left:${DESK[x][0]}px;top:${DESK[x][1]}px" aria-hidden="true">외출 중</div>`;return ""}).join("");
+    if(s_==="sleep"){const k="sleep"+x,bl=BLANKET[x];return IMG["prop_"+k]?`<div class="prop prop-${k} ${zMe||dayPart()==="night"?"dim":""}" style="left:${bl[0]}px;top:${bl[1]}px;width:${bl[2]}px;height:${bl[3]}px" aria-hidden="true"></div><div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]-40}px" aria-hidden="true"><span class="zz">z<b>z</b><i>Z</i></span></div>`:`<div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]}px" aria-hidden="true"><span class="lump"></span><span class="zz">z<b>z</b><i>Z</i></span></div>`}
+    if(s_==="out"){const k="slip"+x;return IMG["prop_"+k]?`<div class="prop prop-${k} ${zMe||dayPart()==="night"?"dim":""}" style="left:${SLIP[x][0]}px;top:${SLIP[x][1]}px;width:30px;height:34px" aria-hidden="true"></div>`:`<div class="outsign" style="left:${DESK[x][0]}px;top:${DESK[x][1]}px" aria-hidden="true">외출 중</div>`}return ""}).join("");
   const bang=unsorted&&!f&&pose!=="sleep"?`<button class="bang" data-act="toCards" aria-label="안 정한 카드 ${unsorted}장" style="left:${mx+22}px;top:${my-92}px">!</button>`:"";
   const eh=pose==="sleep"?52:80;
-  return `<div class="scene"><div class="stage"><div class="world" data-focus="${my}"><div class="room t-${zMe?"night":dayPart()}" role="img" aria-label="${zMe?"불을 끈 ":""}우리 방. 왼쪽 남색 침대는 ${nm("A")}, 오른쪽 초록 침대는 ${nm("B")}.${zMe?" 나는 자는 중.":outMe?" 나는 외출 중.":""}${zO?` ${nm(o)}는 자는 중.`:outO?` ${nm(o)}는 외출 중, 책상에 팻말.`:""}" style="width:392px;height:588px"></div>${props}${elfSVG(elfKey(),pose,`요정 ${elf().name}`,4,`left:${mx}px;top:${my}px;transform:translate(-50%,-100%)`)}${bang}</div>
-${S.room?.demo?`<button class="chip px4 demo-end" data-act="endDemo">둘러보기 끝내기</button>`:""}<div class="hud"><span class="chip px4">${joined(o)?`${nm(o)} ${ST[st[o]]||""}`:"룸메 아직 안 들어옴"}</span><span style="display:flex;gap:6px">${(()=>{const u=unseen();return `<button class="chip light px4 bell" data-act="go" data-arg="notes" aria-label="알림${u?" "+u+"개 새로":""}"><svg viewBox="0 0 12 12" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M5 1h2v1h1v1h1v4h1v1H2V7h1V3h1V2h1zM5 9h2v1H5z"/></svg>${u?`<span class="badge px3">${u}</span>`:""}</button>`})()}<button class="chip light px4" data-act="setSt" data-arg="${NEXT_ST[st[me]]||"sleep"}" aria-label="내 상태 바꾸기, 지금 ${ST[st[me]]||"깨어 있음"}">나 ${ST[st[me]]||"깨어 있음"}</button><button class="chip light px4" data-act="go" data-arg="me" aria-label="설정">⚙</button></span></div></div>${dialog(body)}</div>`;
+  return `<div class="scene"><div class="stage"><div class="world" data-focus="${my}"><div class="room t-${zMe?"night":dayPart()}" role="img" aria-label="${zMe?"불을 끈 ":""}우리 방. 왼쪽 남색 침대는 ${nm("A")}, 오른쪽 초록 침대는 ${nm("B")}.${zMe?" 나는 자는 중.":outMe?" 나는 외출 중.":""}${zO?` ${nm(o)}는 자는 중.`:outO?` ${nm(o)}는 외출 중, 문 앞에 슬리퍼만 있어요.`:""}" style="width:392px;height:588px"></div>${props}${elfSVG(elfKey(),pose,`요정 ${elf().name}`,4,`left:${mx}px;top:${my}px;transform:translate(-50%,-100%)`)}${bang}</div>
+${S.room?.demo?`<button class="chip px4 demo-end" data-act="endDemo">둘러보기 끝내기</button>`:""}<div class="hud"><span class="chip px4">${joined(o)?`${nm(o)} ${ST[st[o]]||""}`:"룸메 아직 안 들어옴"}</span><span style="display:flex;gap:6px">${(()=>{const u=unseen();return `<button class="chip light px4 bell" data-act="go" data-arg="notes" aria-label="알림${u?" "+u+"개 새로":""}"><svg viewBox="0 0 12 12" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M5 1h2v1h1v1h1v4h1v1H2V7h1V3h1V2h1zM5 9h2v1H5z"/></svg>${u?`<span class="badge px3">${u}</span>`:""}</button>`})()}<button class="chip light px4" data-act="setSt" data-arg="${NEXT_ST[st[me]]||"sleep"}" aria-label="내 상태 바꾸기, 지금 ${ST[st[me]]||"깨어 있음"}">나 ${ST[st[me]]||"깨어 있음"}</button></span></div></div>${dialog(body)}</div>`;
 }
 
 /* ---------- 알림함: 답이 필요 없는 소식은 대화창 대신 여기 ---------- */
@@ -748,7 +759,7 @@ function cardDetail(id){
 <h2 class="dh" style="margin-top:0">${nm(o)}가 이걸 하고 싶을 때, 나는</h2>
 ${seg3(c.id,mv)}
 ${mv==="O"?`<label class="sub" for="condE" style="display:block;margin:10px 0 4px">조건 (선택)</label><div class="row" style="margin-top:0"><input id="condE" class="input" maxlength="40" style="flex:3" value="${esc(condOf(mine))}" placeholder="예: 먹고 나서 환기만 해줘"><button class="btn px4" data-act="setCond" data-arg="${c.id}">저장</button></div><p class="sub" style="margin:4px 0 0">${esc(elf().name)}가 이 조건에 맞는지 보고, 모르면 ${nm(o)}에게 먼저 물어봐요.</p>`:""}
-${mine?`<div class="mini" style="margin-top:12px"><span>이 카드 쓰기</span><button class="chip light px4" data-act="toggleCard" data-arg="${c.id}" aria-pressed="${!off}">${off?"꺼짐":"켜짐"}</button></div><p class="sub" style="margin:4px 0 0">끄면 ${esc(elf().name)}가 바로 답하지 않고 나한테 물어봐요. 더 조심하는 쪽이라 ${nm(o)}의 허락 없이 바꿀 수 있어요.</p>`:""}
+${mine?`<p class="sub" style="margin:8px 0 0">요즘엔 아닌 것 같으면 "먼저 물어봐줘"로 바꾸면 돼요. 내 답이라 ${nm(o)}의 허락 없이 바꿀 수 있어요.</p>`:""}
 <h2 class="dh">내가 하고 싶을 때, ${nm(o)}는</h2><div class="mini"><span>${esc(theirTxt)}</span></div>
 <p class="why" style="margin-top:14px">${result}</p>
 ${c.proposal?`<p class="sub" style="margin-top:12px">${esc(elf().name)}가 제안한 카드예요. ${esc(c.proposal.rationale||"")} <button class="lnk" data-act="go" data-arg="thread|${c.proposal.source_case_id}">이 카드가 나온 편지</button></p>`:""}</div>`;
@@ -756,8 +767,10 @@ ${c.proposal?`<p class="sub" style="margin-top:12px">${esc(elf().name)}가 제�
 
 /* ---------- 화면: 설정, 시작 ---------- */
 function meView(){
-  const st=["sleep","out"].includes(S.room?.status?.[S.seat])?S.room.status[S.seat]:"in";
-  return `<div class="page">${header("설정",1)}
+  const st=["sleep","out"].includes(S.room?.status?.[S.seat])?S.room.status[S.seat]:"in",cur=lookN();
+  const looks=LOOKS.filter(L=>L.n===0||IMG["look"+L.n]).map(L=>{const ok=L.ok();return `<button class="look ${cur===L.n?"on":""}" ${ok?`data-act="setLook" data-arg="${L.n}"`:"disabled"} aria-pressed="${cur===L.n}"><span class="elf-${L.n?"look"+L.n:"stand"} lookimg ${ok?"":"locked"}" aria-hidden="true"></span><span class="lookname">${ok?esc(L.name):"잠김"}</span><span class="lookhow">${ok?"":esc(L.how)}</span></button>`}).join("");
+  return `<div class="page">${header("내 프로필")}
+<h2 class="dh" style="margin-top:0">${esc(elf().name)} 꾸미기</h2><p class="sub" style="margin:0 0 8px">같이 쓸수록 하나씩 열려요. 룸메도 같은 ${esc(elf().name)}를 봐요.</p><div class="looks">${looks}</div>
 <h2 class="dh">내 상태</h2><div class="seg">${[["in","깨어 있음"],["sleep","자는 중"],["out","외출 중"]].map(([k,v])=>`<button class="segb ${st===k?"on":""}" data-act="setSt" data-arg="${k}" aria-pressed="${st===k}">${v}</button>`).join("")}</div>
 <h2 class="dh">내 이름</h2><div class="row" style="margin-top:0"><input id="nameS" class="input" maxlength="8" style="flex:2" value="${esc(S.room?.names?.[S.seat]||"")}" placeholder="예: 현지"><button class="btn px4" data-act="saveName">저장</button></div><h2 class="dh">방</h2><div class="list"><div class="mini"><span>방 코드 </span><b class="dh" style="font-size:16px;font-weight:400;letter-spacing:.08em">${esc(S.code)}</b></div></div>
 <div class="col">${S.room?.demo?`<button class="btn px4" data-act="switchSeat">${nm(other())} 화면으로 보기</button><button class="btn px4" data-act="endDemo">둘러보기 끝내기</button>`:""}<button class="btn px4" data-act="export">기록 내보내기</button>${S.confirmLeave?`<div class="why" style="margin:0" role="alert">방을 나가도 방과 편지는 그대로 있어요. 다시 들어오려면 방 코드 <b class="dh" style="color:var(--ink);letter-spacing:.08em">${esc(S.code)}</b>가 필요해요. 이 기기에서는 첫 화면에 남겨둘게요.<div class="row"><button class="btn px4" data-act="leaveNo">취소</button><button class="btn main px4" data-act="leave">나가기</button></div></div>`:`<button class="btn px4" data-act="leaveAsk">방 나가기</button>`}</div>
@@ -800,9 +813,9 @@ function render(){
   if(S.route.name==="ob"){if(S.cards.length&&!S.cards.some(c=>!c[S.seat]&&!c.locked))S.route={name:"home"};else{if(!paint(app,onboardView()+live))return;return}}
   const un=S.cards.filter(c=>!c[S.seat]&&!c.locked).length,todo=S.reqs.filter(todoFor).length,R=S.route,n=R.name;
   let main;try{main=n==="cards"||n==="log"?cardsView():n==="agr"?agrDetail(R.id):n==="sort"?sortView():n==="letters"?lettersView():n==="thread"?threadView(R.id):n==="card"?cardDetail(R.id):n==="me"?meView():n==="notes"?notesView():homeView()}catch(e){console.error(e);main=`<div class="page"><h1 class="ttl">화면을 그리지 못했어요</h1><p class="sub">${esc(n)}: ${esc(String(e&&e.stack||e).slice(0,400))}</p></div>`}
-  const TI={home:"M5 1h2v1h1v1h1v1h1v1h1v1h-1v5H7V8H5v3H2V6H1V5h1V4h1V3h1V2h1z",letters:"M1 2h10v8H1zM2 3v1h1v1h1v1h1v1h2V6h1V5h1V4h1V3z",cards:"M1 3h6v8H1zM5 1h6v8H8V2H5z"};
+  const TI={me:"M4 1h4v1h1v4H8v1H4V6H3V2h1zM2 8h8v1h1v2H1V9h1z",home:"M5 1h2v1h1v1h1v1h1v1h1v1h-1v5H7V8H5v3H2V6H1V5h1V4h1V3h1V2h1z",letters:"M1 2h10v8H1zM2 3v1h1v1h1v1h1v1h2V6h1V5h1V4h1V3z",cards:"M1 3h6v8H1zM5 1h6v8H8V2H5z"};
   const tab=(k,l,b)=>`<button class="tab px3" data-act="go" data-arg="${k}" ${S.tab===k?'aria-current="page"':""}><svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${TI[k]}"/></svg>${l}${b?`<span class="badge px3" aria-label="${b}개">${b}</span>`:""}</button>`;
-  if(!paint(app,`${main}<nav class="tabs" aria-label="하단 메뉴">${tab("home","우리 방",0)}${tab("letters","편지",todo)}${tab("cards","카드",un)}</nav>${live}`))return;
+  if(!paint(app,`${main}<nav class="tabs" aria-label="하단 메뉴">${tab("home","우리 방",0)}${tab("letters","편지",todo)}${tab("cards","카드",un)}${tab("me","내 프로필",0)}</nav>${live}`))return;
   for(const [k,v] of Object.entries(saved)){const el=document.getElementById(k);if(el){if(el.type==="checkbox")el.checked=v;else el.value=v}}
   if(keep){const el=document.getElementById(keep);if(el){if(el.type==="checkbox")el.checked=kc;else el.value=kv;el.focus()}}
   layoutWorld();
@@ -837,6 +850,7 @@ document.addEventListener("click",async e=>{
   else if(a==="setCond"){const c=S.cards.find(x=>x.id===arg);const t=($("#condE")?.value||"").trim().slice(0,40);if(c?.[S.seat]){await sortCard({...c,redo:S.seat},vOf(c[S.seat]),t);announce("조건을 저장했어요")}}
   else if(a==="toggleCard"){const c=S.cards.find(x=>x.id===arg);if(c){const off=!c["off_"+S.seat];await db.doc(`rooms/${S.code}/cards/${c.id}`).update({["off_"+S.seat]:off,editedBy:S.seat,editedAt:Date.now(),editKind:off?"off":"on"});announce(off?"카드를 껐어요":"카드를 켰어요")}}
   else if(a==="endDemo"){leave()}
+  else if(a==="setLook"){await roomRef().update({look:+arg});announce(`${elf().name} 모습을 바꿨어요`)}
   else if(a==="cancel"||a==="ok"){S.flow=null;render()}
   else if(a==="sendClarify"||a==="skipClarify"){const f=S.flow,ans=a==="sendClarify"?($("#clT")?.value||"").trim():"";b.disabled=true;const t=ans?`${f.text} (${ans})`:f.text;if(f.kind==="request")await submitAsk(t,true,true);else await submitSay(t,true)}
   else if(a==="confirmAsk"){const t=($("#askF")?.value||"").trim();if(!t)return;b.disabled=true;await sendAsk(t,S.flow?.facts||[])}
