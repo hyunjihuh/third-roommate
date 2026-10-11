@@ -32,7 +32,7 @@ const condOf=x=>!x||x.cond==="미리 말하면"?"":(x.cond||"");
 const ansOf=(c,s)=>c&&!c["off_"+s]?c[s]:null;
 const ST={in:"깨어 있음",sleep:"자는 중",out:"외출 중"};
 const NEXT_ST={in:"sleep",sleep:"out",out:"in"};
-const STAGE={direct:"바로 답",fyi:"알림",queued:"깨면 전달",delivered:"답 기다리는 중",replied:"답 옴",done:"끝",constraints:"각자 조건 확인",aligning:"대안 고르는 중",agreed:"합의",rule:"기숙사 규칙",blocked:"직접 얘기하기",cancelled:"그만둠"};
+const STAGE={direct:"바로 답",fyi:"알림",queued:"깨면 전달",delivered:"답 기다리는 중",replied:"답 옴",done:"끝",constraints:"각자 조건 확인",aligning:"대안 고르는 중",agreed:"합의",rule:"기숙사 규칙",blocked:"합의 못 함",cancelled:"그만둠"};
 const ROUTE={covered_by_agreement:"카드 범위 안",clarification_needed:"정보가 더 필요함",coordination_needed:"상대에게 확인 필요",rule:"기숙사 규칙"};
 const DAY_LIMIT=20,WAIT_MS=10*60*1000,MAX_ROUNDS=3;
 const $=s=>document.querySelector(s);
@@ -48,6 +48,9 @@ const nm=s=>esc((S.room&&S.room.names&&S.room.names[s])||(s===S.seat?"나":"룸�
 const joined=s=>!!S.room?.members?.[s];
 // 모델이 만든 문장에 남은 A, B 글자를 이름으로 (예: "A가 스터디룸에서" -> "하늘이 스터디룸에서"는 josa()가 마저 고친다)
 const nameT=t=>String(t??"").replace(/(^|[^A-Za-z0-9])([AB])(?=[가-힣\s.,!?:)]|$)/g,(m,pre,x)=>pre+((S.room?.names?.[x])||(x===S.seat?"나":"룸메")));
+// 편지 문장: 보낸 사람은 자기가 승인한 1차 문장, 받는 사람은 보라가 받는 쪽 말투로 다듬은 2차 문장만 본다.
+// 2차가 아직이면 null(화면엔 "다듬는 중"). AI가 없거나 다듬기에 실패하면 1차로 대신
+const letterText=r=>r.to!==S.seat?(r.draft||r.text):r.translations?.[S.seat]?nameT(r.translations[S.seat]):(!sample||S.toneFail?.[r.id])?(r.draft||r.text):null;
 const toneKey=s=>"soft"; // 듣는 말투 설정은 뺐다. 받는 사람 말투는 늘 부드럽게
 const tone=s=>TONES[toneKey(s)]||null;
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
@@ -211,6 +214,7 @@ async function C0(raw){
 {draft, clarification, missing_fields}를 반환하라.
 초안은 작성자가 해당 버전을 승인하기 전까지 비공개다.
 [구현 추가 필드] key_facts: 꼭 전해야 하는 시간, 장소, 행동을 짧은 낱말 2-4개. unsafe: 위협이나 괴롭힘이면 true.
+[구현 추가] 받는 사람을 부르는 말("A야", "B야", 이름 부르기)로 시작하지 않는다. 주어나 목적어로 "A", "B" 글자를 쓰지 않는다. 일어난 일은 일어난 대로 쓴다(예: "코피가 났어"를 "코피가 나면"으로 바꾸지 않는다).
 [작성자] ${S.seat} / [받는 사람] ${other()}
 ${data("private_complaint",raw)}
 [출력] {"draft":"${other()}에게 보낼 부탁 한두 문장(반말)","clarification":"필요할 때만 질문 하나, 아니면 빈 문자열","missing_fields":[],"key_facts":[],"unsafe":false}`,"quick");
@@ -266,6 +270,7 @@ async function C2(req){
 지금 답할 사람은 ${me_} 한 명이다. ${me_}에게만 보이는 짧은 질문을 한두 개 만든다.
 [${me_}의 역할] ${role}
 ${guide}
+[방 생활이 아닌 제안] 이 일이 방 생활 규칙이 아니라 같이 하자는 제안(영화, 밥, 운동 등)이면 위 질문 예 대신 이렇게 묻는다. 제안을 받은 사람에게는 무엇 때문에 어려운지(시간, 장소, 그 영화 자체 등)와 어떤 걸로 바꾸면 괜찮은지(다른 날, 다른 시간, 다른 영화). 제안한 사람에게는 꼭 그 영화와 그 시간이어야 하는지, 다른 날이나 다른 걸로도 괜찮은지. "같이 안 가면 뭐가 아쉬워?"처럼 마음이나 아쉬움을 캐묻지 않는다.
 [규칙] 질문 예의 틀을 이 일의 내용(시간, 장소, 행동)에 맞게 고쳐 쓴다. 이미 아는 정보는 다시 묻지 않는다. 특히 shared_case의 답 괄호 안에 ${me_}가 이미 적은 내용(예: "9시 전엔 자고 있어")은 다시 묻지 말고, 그다음을 묻는다. 상대의 비공개 답변을 드러내지 않는다. 짧은 반말 한 문장씩, 최대 2개.
 ${data("shared_case",`${S.room?.names?.[req.from]||req.from}의 ${req.kind==="do"?"요청":"부탁"}: ${req.draft||req.text}\n${S.room?.names?.[req.to]||req.to}의 답: 어렵다고 함${req.reply?.note?" (이유: "+req.reply.note+")":""}`)}
 [출력] {"questions":["반말 질문 1-2개"],"unresolved_fields":[]}`);
@@ -342,7 +347,7 @@ async function TONE(req,seat){
 [전달 말투 · 구현 추가 호출]
 ${nA}가 승인한 문장을 ${nB}가 듣기 편한 말투의 한 문장으로 바꾼다. 화면에 이미 "${nA}가 ${fyi?"알려왔어요":ask_?"부탁해요":"물어봐요"}"라고 나오므로, 그 아래에 올 내용 문장만 쓴다. 말투보다 정확성이 먼저다.
 [말투] ${t.style}
-[규칙] 사실(시간, 장소, 행동, 조건)은 빠뜨리거나 바꾸지 않는다. 새 사실이나 감정을 더하지 않는다. 승인 문장에 없는 때("지금", "오늘", "내일")를 붙이지 않는다. 보낸 사람이 겪는 일이면 "내가"처럼 주어를 밝혀 누가 겪는지 헷갈리지 않게 한다. "혹시" 같은 쿠션어는 부탁하는 말 바로 앞에 한 번만 쓴다. 룸메끼리 쓰는 반말로 쓴다. 이름("${nA}", "${nB}"), "A", "B" 같은 기호, "물어봐요", "부탁해요", "~래요", "~라고 전했다" 같은 전달 표현은 넣지 않는다. ${fyi?"허락을 구하는 질문이 아니라 알리는 문장으로 끝낸다(예: \"~할게.\").":ask_?"부탁하는 문장으로 끝낸다.":"괜찮은지 묻는 문장으로 끝낸다."}
+[규칙] 사실(시간, 장소, 행동, 조건)은 빠뜨리거나 바꾸지 않는다. 새 사실이나 감정을 더하지 않는다. 승인 문장에 없는 때("지금", "오늘", "내일")를 붙이지 않는다. 보낸 사람이 겪는 일이면 "내가"처럼 주어를 밝혀 누가 겪는지 헷갈리지 않게 한다. "혹시" 같은 쿠션어는 부탁하는 말 바로 앞에 한 번만 쓴다. 이미 일어난 일을 가정("~하면")으로 바꾸지 않고, 때와 시제를 승인 문장 그대로 둔다(예: "코피가 났어. 휴지 챙겨줄래?" → "나 코피가 났어. 혹시 휴지 좀 챙겨줄래?"). 룸메끼리 쓰는 반말로 쓴다. 이름("${nA}", "${nB}"), "A", "B" 같은 기호, "물어봐요", "부탁해요", "~래요", "~라고 전했다" 같은 전달 표현은 넣지 않는다. ${fyi?"허락을 구하는 질문이 아니라 알리는 문장으로 끝낸다(예: \"~할게.\").":ask_?"부탁하는 문장으로 끝낸다.":"괜찮은지 묻는 문장으로 끝낸다."}
 [예시] 승인 문장 "내일 아침 8시에 방에서 과외 1시간 해도 돼?" → 부드럽게: "혹시 내일 아침 8시에 방에서 1시간쯤 과외해도 괜찮을까?" / 직설적으로: "내일 아침 8시, 방에서 과외 1시간. 괜찮아?"${fyi?` / 알림일 때: "내일 아침 8시에 방에서 과외 1시간 할게."`:""}
 ${data("approved_text",req.draft||req.text)}
 ${data("key_facts",(req.facts||[]).join(", "))}
@@ -429,7 +434,7 @@ async function background(){
   for(const r of S.reqs){
     if(r.to===S.seat&&r.stage==="queued"&&S.room&&S.room.status?.[S.seat]!=="sleep"&&joined(S.seat)&&!S.busy.has("w"+r.id)){S.busy.add("w"+r.id);try{await reqRef(r.id).update({stage:"delivered",deliveredAt:Date.now()})}catch(e){}S.busy.delete("w"+r.id)}
     if(sample&&r.to===S.seat&&["delivered","fyi"].includes(r.stage)&&!r.translations?.[S.seat]&&!S.busy.has(r.id)){
-      S.busy.add(r.id);try{const t=await TONE(r,S.seat);if(t)await mergeIn(reqRef(r.id),{translations:{[S.seat]:t}})}catch(e){}S.busy.delete(r.id);render();
+      S.busy.add(r.id);let ok=false;try{const t=await TONE(r,S.seat);if(t){await mergeIn(reqRef(r.id),{translations:{[S.seat]:t}});ok=true}}catch(e){}if(!ok){S.toneFail=S.toneFail||{};S.toneFail[r.id]=1}S.busy.delete(r.id);render();
     }
     {const pa=r.picks?.A,pb=r.picks?.B;if(r.stage==="aligning"&&(r.from===S.seat||r.to===S.seat)&&pa&&pb&&pa.v===r.version&&pb.v===r.version&&pa.i===pb.i&&(laterSeat(pa.at,pb.at)===S.seat||(r.from===S.seat&&Date.now()-Math.max(pa.at||0,pb.at||0)>45000)))await finalize(r,pa.i)}
     if(r.stage==="constraints"&&(r.from===S.seat||r.to===S.seat)&&r.consDone?.A&&r.consDone?.B&&!S.busy.has("c4"+r.id)&&(laterSeat(r.done_A,r.done_B)===S.seat||Date.now()-(r.consAt||0)>45000)){S.busy.add("c4"+r.id);await runC4(r);S.busy.delete("c4"+r.id)}
@@ -584,7 +589,7 @@ function homeView(){
   else if(f?.k==="agreed"){body=`<p class="say">둘 다 같은 안을 골랐어요. 카드로 만들었어요.\n"${esc(nameT(f.text))}"\n1주 해보고 어땠는지 물어볼게요.</p>${choices([["ok","좋아"]].concat(f.id?[["go","카드 보기","agr|"+f.id]]:[]))}`}
   else if(!f&&newAgr){body=`<p class="say">둘 다 같은 안을 골랐어요. 카드로 만들었어요.\n"${esc(nameT(newAgr.text))}"\n1주 해보고 어땠는지 물어볼게요.</p>${choices([["seenAgr","좋아",newAgr.id],["go","카드 보기","agr|"+newAgr.id]])}`}
   else if(f?.k==="wrongDone"){pose="bow";body=`<p class="say">제가 잘못 읽었어요. ${nm(o)}에게 물어볼게요.</p>${choices([["ok","괜찮아"]])}`}
-  else if(incoming){const t=incoming.translations?.[me],late=(incoming.deliveredAt||incoming.ts)-incoming.ts>30*60e3;pose="letter";body=`<p class="say">${nm(incoming.from)}가 ${incoming.kind==="do"?"물어봐요":"부탁해요"}.${late?` (${esc(when(incoming.ts))}에 보낸 편지)`:""}\n${t?esc(nameT(t)):esc(incoming.draft)+(S.busy.has(incoming.id)?"\n(내 말투로 바꾸는 중)":"")}</p>${factChips(incoming.facts)}<label class="vh" for="noteT">조건이나 한마디</label><input id="noteT" class="input" maxlength="60" placeholder="조건이나 이유를 한마디 (예: 11시 전까지만)">${choices(replyBtns(incoming))}`}
+  else if(incoming){const t=letterText(incoming),late=(incoming.deliveredAt||incoming.ts)-incoming.ts>30*60e3;pose="letter";body=`<p class="say">${nm(incoming.from)}가 ${incoming.kind==="do"?"물어봐요":"부탁해요"}.${late?` (${esc(when(incoming.ts))}에 보낸 편지)`:""}\n${t!=null?esc(t):`${esc(elf().name)}가 편지를 펴는 중이에요...`}</p>${t!=null?factChips(incoming.facts):""}<label class="vh" for="noteT">조건이나 한마디</label><input id="noteT" class="input" maxlength="60" placeholder="조건이나 이유를 한마디 (예: 11시 전까지만)">${choices(replyBtns(incoming))}`}
   else if(fyi){body=`<p class="say">${nm(fyi.from)}가 알려왔어요. 둘이 정해둔 카드 안이라 답은 안 해도 돼요.\n${esc(nameT(fyi.translations?.[me]||fyi.draft))}</p>${factChips(fyi.facts)}${choices([["fyiOk","확인했어",fyi.id]])}`}
   else if(replied){const c=replied.reply.choice;body=`<p class="say">${nm(o)}의 답이에요.\n${esc(replyLine(me,c,replied.reply.note,replied.kind))}</p>${choices(c==="hard"?[["align","같이 맞춰보기",replied.id],["ack","다음에 할게",replied.id]]:[["ack","알겠어",replied.id]])}`}
   else if(cons){pose="sniff";body=`<p class="say">${cons.from===me?"":`${nm(o)}가 같이 맞춰보자고 했어요.\n`}둘 다 괜찮은 방법을 찾으려고 ${esc(elf().name)}가 각자에게 따로 물어봐요. ${nm(o)}는 내 답을 못 봐요.</p>${choices([["go","답하러 가기","thread|"+cons.id]])}`}
@@ -614,7 +619,7 @@ ${S.room?.demo?`<button class="chip px4 demo-end" data-act="endDemo">둘러보�
 function notes(){const me=S.seat,o=other(),N=[];
   for(const c of S.cards)if(c.editedBy===o&&c.editedAt)N.push({t:c.editedAt,txt:`${nm(o)}가 "${esc(c.title)}" 카드를 ${c.editKind==="off"?"껐어요":c.editKind==="on"?"다시 켰어요":"고쳤어요"}.`,go:"card|"+c.id});
   for(const a of S.agrs)if(a.state==="off"&&a.endedBy===o&&a.endedAt)N.push({t:a.endedAt,txt:`${nm(o)}가 같이 만든 카드를 그만했어요. "${esc(nameT(a.text))}"`});
-  for(const r of S.reqs)if(r.to===me&&(r.stage==="fyi"||(r.stage==="done"&&r.c1?.trial)))N.push({t:r.ts,txt:`${nm(r.from)}가 알려왔어요. ${esc(nameT(r.translations?.[me]||r.draft))}`,go:"thread|"+r.id});
+  for(const r of S.reqs)if(r.to===me&&(r.stage==="fyi"||(r.stage==="done"&&r.c1?.trial)))N.push({t:r.ts,txt:`${nm(r.from)}가 알려왔어요. ${esc(letterText(r)??"")}`,go:"thread|"+r.id});
   return N.sort((a,b)=>b.t-a.t).slice(0,30)}
 const noteKey=()=>"noteSeen_"+S.code+S.seat;
 const unseen=()=>{const t=+(ls(noteKey())||0);return notes().filter(n=>n.t>t).length};
@@ -626,7 +631,7 @@ function lettersView(){
   const me=S.seat,all=S.reqs.filter(r=>(r.from===me||r.to===me)&&!(r.to===me&&["direct","rule","queued"].includes(r.stage))).sort((a,b)=>b.ts-a.ts);
   const todo=all.filter(todoFor),rest=all.filter(r=>!todoFor(r));
   const who=r=>r.stage==="direct"?`${nm(r.from)} · ${esc(elf().name)}가 바로 답함`:r.stage==="rule"?`${nm(r.from)} · 전하지 않음`:`${nm(r.from)} → ${nm(r.to)}`;
-  const row=r=>{const t=todoFor(r);return `<button class="lt" data-act="go" data-arg="thread|${r.id}"><span class="lt-main"><span class="lt-who"><i style="background:var(--${r.from==="A"?"a":"b"})"></i>${who(r)} · ${when(r.ts)}</span><span class="lt-txt">${esc(r.draft||r.text)}</span></span><span class="lt-st ${t?"lt-todo":""}">${t?"내 차례":STAGE[r.stage]||r.stage}</span></button>`};
+  const row=r=>{const t=todoFor(r);return `<button class="lt" data-act="go" data-arg="thread|${r.id}"><span class="lt-main"><span class="lt-who"><i style="background:var(--${r.from==="A"?"a":"b"})"></i>${who(r)} · ${when(r.ts)}</span><span class="lt-txt">${letterText(r)!=null?esc(letterText(r)):`${esc(elf().name)}가 편지를 펴는 중이에요...`}</span></span><span class="lt-st ${t?"lt-todo":""}">${t?"내 차례":STAGE[r.stage]||r.stage}</span></button>`};
   return `<div class="page">${header("편지")}
 ${todo.length?`<h2 class="sec">내 차례 ${todo.length}</h2><div class="ltbox">${todo.map(row).join("")}</div>`:""}
 ${rest.length?`<h2 class="sec">${todo.length?"지난 편지":"오간 편지"}</h2><div class="ltbox">${rest.map(row).join("")}</div>`:""}
@@ -635,7 +640,7 @@ ${all.length?"":`<p class="sub" style="margin-top:30px;text-align:center">아직
 // 편지 위에 붙는 지금 단계 한 줄
 // 편지 위 단계 표시: 짧은 이름표 + (필요할 때) 둘의 진행 점
 function stageLine(r){const me=S.seat,N=nm,dot=(x,ok)=>`<span class="stdot ${ok?"on":""}">${N(x)}</span>`;
-  const t=({direct:"보라가 바로 답함",rule:"기숙사 규칙 · 전하지 않음",fyi:"알림",queued:joined(r.to)?"자는 중 · 깨면 전달":"룸메 들어오면 전달",delivered:r.to===me?"내 답 차례":"답 기다리는 중",replied:r.from===me?"답 옴":"답 보냄",done:"끝",constraints:"조건 답하기",aligning:"대안 고르기",agreed:r.once?"합의 · 이번만":"합의 · 카드가 됨",blocked:"멈춤 · 직접 얘기 필요",cancelled:"취소됨"})[r.stage]||"";
+  const t=({direct:"보라가 바로 답함",rule:"기숙사 규칙 · 전하지 않음",fyi:"알림",queued:joined(r.to)?"자는 중 · 깨면 전달":"룸메 들어오면 전달",delivered:r.to===me?"내 답 차례":"답 기다리는 중",replied:r.from===me?"답 옴":"답 보냄",done:"끝",constraints:"조건 답하기",aligning:"대안 고르기",agreed:r.once?"합의 · 이번만":"합의 · 카드가 됨",blocked:"합의 못 함 · 둘이 직접 얘기해봐요",cancelled:"취소됨"})[r.stage]||"";
   const dots=r.stage==="constraints"?["A","B"].map(x=>dot(x,r.consDone?.[x])).join(""):r.stage==="aligning"?["A","B"].map(x=>dot(x,r.picks?.[x]?.v===r.version)).join(""):"";
   return `<span class="stpill st-${r.stage}">${t}</span>${dots}`}
 const routeTxt=(route,to)=>({covered_by_agreement:"카드 범위 안이라 바로 답",clarification_needed:"정보가 더 필요함",coordination_needed:`${nm(to)}에게 물어봐야 함`,rule:"기숙사 규칙에 걸림"})[route]||"-";
@@ -643,10 +648,10 @@ const stripWho=t=>String(t||"").replace(/^[AB]\s*[:가이는은]?\s+/,"");
 function threadView(id){
   const r=findReq(id);if(!r)return `<div class="page">${header("편지",1)}<p class="sub">이 편지를 찾을 수 없어요.</p></div>`;
   const me=S.seat,o=other(),t=r.translations?.[r.to],part=r.from===me||r.to===me;
-  const body=(r.to===me&&t)?nameT(t):(r.draft||r.text);
+  const body=letterText(r)??`${elf().name}가 편지를 펴는 중이에요...`;
   const paper=(to,from,txt,extra,at)=>`<div class="letter"><p class="l-to">${nm(to)}에게</p><p class="l-body">${esc(txt)}</p>${extra||""}<p class="l-from">${at?when(at)+" · ":""}${nm(from)}</p></div>`;
   let h=`<div class="stline">${stageLine(r)}</div>`;
-  h+=paper(r.to,r.from,body,factChips(r.facts)+(r.to===me&&t?`<details class="l-more"><summary>보낸 그대로 보기</summary><p>${esc(r.draft)}</p></details>`:""),r.ts);
+  h+=paper(r.to,r.from,body,factChips(r.facts),r.ts);
   if(r.c1&&r.from===me)h+=`<details class="l-more out"><summary>${esc(elf().name)}가 이렇게 읽었어요: ${routeTxt(r.c1.route,r.to)}</summary><p>${esc(nameT(r.c1.reason||""))}${(r.c1.evidence_ids||[]).length?`<br>본 카드: ${r.c1.evidence_ids.map(cid=>`<button class="lnk" data-act="go" data-arg="${evGo(cid)}">${esc(nameT(evTitle(cid)))}</button>`).join(", ")}`:""}</p></details>`;
   // 답장은 답한 사람 본인의 말로 (전해 들은 말투 "어렵대요"는 우리 방 대화창에서만)
   if(r.reply)h+=paper(r.from,r.to,replySelf(r.kind,r.reply.choice,r.reply.note),"",r.reply.at);
@@ -678,7 +683,7 @@ function threadView(id){
 }
 
 /* ---------- 화면: 카드 ---------- */
-function cardHTML(c){const col=CATS[c.cat]||"#B9A6F5";return `<div class="bigcard px6"><div><div class="ttag" style="background:${col};display:flex;justify-content:space-between"><span>${esc(c.cat)}</span>${c.origin==="proposal"?"<span>제안</span>":""}</div>${art(c)}<div style="padding:16px 14px 16px;box-shadow:inset 0 3px 0 var(--line)"><p style="margin:0;font-family:var(--ft);font-size:24px;line-height:1.35;text-align:center">${esc(c.title)}</p>${c.flavor?`<p class="s12" style="margin:8px 0 0;color:var(--muted);text-align:center;line-height:1.6">${esc(c.flavor)}</p>`:""}</div></div></div>`}
+function cardHTML(c){const col=CATS[c.cat]||"#B9A6F5";return `<div class="bigcard px6"><div><div class="ttag" style="background:${col};display:flex;justify-content:space-between"><span>${esc(c.cat)}</span>${c.origin==="proposal"?"<span>제안</span>":""}</div>${art(c)}<div style="padding:16px 14px 16px;box-shadow:inset 0 3px 0 var(--line)"><p style="margin:0;font-family:var(--ft);font-size:24px;line-height:1.35;text-align:center">${esc(c.title)}</p>${c.flavor&&!c.locked?`<p class="s12" style="margin:8px 0 0;color:var(--muted);text-align:center;line-height:1.6">${esc(c.flavor)}</p>`:""}</div></div></div>`}
 function stateOf(c){if(c.locked)return["기숙사 규칙","var(--muted)"];const m=c[S.seat];if(!m)return["아직 안 정함","var(--muted)"];if(c["off_"+S.seat])return["꺼둠","var(--muted)"];const v=vOf(m);return[VLAB[v],v==="O"?"#1B7559":"#B3261E"]}
 const pickTxt=x=>x?`${VLAB[vOf(x)]}${condOf(x)?", "+condOf(x):""}`:"";
 const evTitle=id=>String(id).startsWith("g_")?(S.agrs.find(a=>"g_"+a.id===id)?.text||"같이 만든 카드"):(S.cards.find(c=>c.id===id)?.title||id);
