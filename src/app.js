@@ -7,11 +7,14 @@ const ELF_MAPS=__MAPS__;
 const ELVES={bora:{name:"보라",map:"모자 요정"},monggeul:{name:"몽글",map:"소녀 요정"},ttobak:{name:"또박",map:"앞치마 요정"},mungge:{name:"뭉게",map:"구름 요정"}};
 const TONES={
   soft:{label:"부드럽게",desc:"'혹시', '괜찮으면'을 넣어 조심스럽게",style:"부드럽고 조심스럽게. '혹시', '괜찮으면' 같은 쿠션어를 한 번 쓴다."},
-  direct:{label:"직설적으로",desc:"핵심만 짧게, 시간과 조건부터",style:"직설적이고 아주 짧게. 쿠션어, 인사, 이유 설명 없이 언제, 어디서, 무엇을 순서로 끊어 쓰고 20자 안팎으로 끝낸다."},
+  direct:{label:"직설적으로",desc:"핵심만 짧게, 시간과 조건부터",style:"직설적이고 아주 짧게. 쿠션어('혹시', '괜찮으면'), 인사, 이유 설명 없이 언제, 어디서, 무엇을 순서로 끊어 쓰고 20자 안팎으로 끝낸다. 승인 문장보다 길게 쓰지 않는다. 승인 문장이 이미 짧은 반말이면 거의 그대로 쓴다."},
   warm:{label:"다정하게",desc:"듣는 나도 챙기는 말을 한마디",style:"다정하고 따뜻하게. 듣는 사람을 챙기는 말을 한마디 붙인다. 보낸 사람의 감정을 지어내지 않는다."},
   light:{label:"가볍게",desc:"농담 살짝, 부담 없이",style:"가볍고 유쾌하게. 살짝 장난스러운 표현을 한 번 쓰되 놀리거나 비꼬지 않는다."}
 };
 const PREVIEW={soft:"혹시 괜찮으면 아침 7시 반 드라이기는 욕실에서 써줄 수 있을까?",direct:"평일 7시 반 드라이기, 욕실에서. 가능해?",warm:"B가 아침 7시 반 드라이기 소리에 깬대요. 조금만 조정해줄 수 있을까요? 둘 다 편한 아침이면 좋겠어요.",light:"B한테서 작은 부탁 도착! 7시 반 드라이기 바람이 B 꿈을 날린대요. 조금 조정 가능?"};
+// 답 버튼과 편지에 쓰는 답한 사람 본인의 말 (반말로 통일). 허락(do)과 부탁(ask)은 답이 다르다
+const REPLY_SELF={do:{ok:"응, 괜찮아",cond:"조건 있으면 괜찮아",hard:"이번엔 어려워"},ask:{ok:"응, 그렇게 할게",cond:"조건 있으면 할 수 있어",hard:"이번엔 어려워"}};
+const REPLY_LINE_ASK={soft:{ok:"그렇게 해주겠대요.",cond:"조건이 있으면 해주겠대요.",hard:"이번엔 어렵대요. 대신 같이 맞춰볼 수 있어요."},direct:{ok:"해준대요.",cond:"조건부로 해준대요.",hard:"이번엔 어렵대요."}};
 const REPLY_LINE={soft:{ok:"괜찮대요. 편하게 해도 될 것 같아요.",cond:"조건이 있으면 괜찮대요.",hard:"이번엔 어렵대요. 대신 같이 맞춰볼 수 있어요."},direct:{ok:"OK래요.",cond:"조건부 OK.",hard:"이번엔 어렵대요."},warm:{ok:"괜찮대요! 마음 쓰지 않아도 돼요.",cond:"조건이 있으면 괜찮대요. 같이 지켜봐요.",hard:"이번엔 어렵대요. 괜찮아요, 다른 방법 찾아봐요."},light:{ok:"오케이 사인 받았어요!",cond:"조건 하나 달고 오케이래요.",hard:"이번엔 패스래요. 다른 길로 가볼까요?"}};
 const CATS={"개인 공간":"#F28C6B","잠":"#F2C94C","청결":"#A9D9B0","손님":"#F7A1C4","소리":"#B9A6F5","빛":"#F2C94C","방 사용":"#F28C6B","사람":"#F7A1C4","물건":"#E2BC8A","온도":"#9AD0F5","기숙사 규칙":"#C9D3DE"};
 const CAT_ICON={"소리":"phone","빛":"lamp","방 사용":"laptop","사람":"friends","물건":"fridge","온도":"thermo","기숙사 규칙":"thermo"};
@@ -33,7 +36,11 @@ let unsubs=[],condSel={};
 const other=()=>S.seat==="A"?"B":"A";
 const elfKey=()=>S.room?.elf||"bora";
 const elf=()=>ELVES.bora;
-const nm=s=>esc((S.room&&S.room.names&&S.room.names[s])||s);
+// 화면에 쓰는 이름. 이름을 아직 안 넣었으면 A, B 대신 "나" / "룸메"
+const nm=s=>esc((S.room&&S.room.names&&S.room.names[s])||(s===S.seat?"나":"룸메"));
+const joined=s=>!!S.room?.members?.[s];
+// 모델이 만든 문장에 남은 A, B 글자를 이름으로 (예: "A가 스터디룸에서" -> "하늘이 스터디룸에서"는 josa()가 마저 고친다)
+const nameT=t=>String(t??"").replace(/(^|[^A-Za-z0-9])([AB])(?=[가-힣\s.,!?:)]|$)/g,(m,pre,x)=>pre+((S.room?.names?.[x])||(x===S.seat?"나":"룸메")));
 const toneKey=s=>S.room?.tones?.[s]||"soft";
 const tone=s=>TONES[toneKey(s)]||null;
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
@@ -44,8 +51,21 @@ function code6(){const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0
 function announce(t){const r=$("#live");if(r)r.textContent=t;toast(t)}
 function toast(t){let e=document.getElementById("toast");if(!e){e=document.createElement("div");e.id="toast";e.setAttribute("aria-hidden","true");document.body.appendChild(e)}e.textContent=t;e.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("on"),1800)}
 const roomRef=()=>db.doc("rooms/"+S.code);
+/* 묶음 필드(names, status, picks 등)에 내 칸만 쓰기: 쓰기 직전에 문서를 새로 읽어 합친다.
+   저장소의 doc_merge는 맨 위 필드만 합치므로, 화면에 있던 옛 값으로 묶음을 통째로 쓰면 상대 칸이 지워진다
+   (실서버에서 방 데이터가 오기 전에 이름을 저장해 룸메 이름이 사라진 일이 있었음) */
+async function mergeIn(ref,patch){const cur=(await ref.get()).data()||{};const out={};for(const [k,v] of Object.entries(patch))out[k]=v&&typeof v==="object"&&!Array.isArray(v)?{...(cur[k]||{}),...v}:v;await ref.update(out);return {...cur,...out}}
 const reqRef=id=>db.doc(`rooms/${S.code}/requests/${id}`);
 const findReq=id=>S.reqs.find(x=>x.id===id);
+/* 둘이 동시에 쓰는 칸(대안 선택, 각자 조건)은 사람마다 맨 위 필드(pick_A, cons_A, done_A)에 따로 쓴다.
+   저장소는 맨 위 필드끼리는 한 줄 단위로 안전하게 합치므로 동시에 써도 서로 지워지지 않는다. 읽을 땐 예전 모양으로 합친다 */
+function normReq(r){const pk={...(r.picks||{})},cd={...(r.consDone||{})},cs={...(r.constraints||{})};
+  for(const x of ["A","B"]){if(("pick_"+x) in r){if(r["pick_"+x])pk[x]=r["pick_"+x];else delete pk[x]}if(("done_"+x) in r){if(r["done_"+x])cd[x]=true;else delete cd[x]}if(("cons_"+x) in r&&r["cons_"+x])cs[x]=r["cons_"+x]}
+  return {...r,picks:pk,consDone:cd,constraints:cs}}
+const PICK_RESET={picks:{},pick_A:null,pick_B:null},CONS_RESET={constraints:{},consDone:{},cons_A:null,cons_B:null,done_A:null,done_B:null};
+// 둘 중 한 기기만 할 일(대안 만들기, 카드 만들기)은 저장된 시각으로 정한다: 나중에 한 쪽, 같으면 A. 두 기기가 같은 답을 낸다
+const laterSeat=(ta,tb)=>{ta=typeof ta==="number"?ta:0;tb=typeof tb==="number"?tb:0;return tb>ta?"B":"A"};
+const freshReq=async id=>normReq({id,...((await reqRef(id).get()).data()||{})});
 
 
 /* ---------- 로컬 모드: claude.ai 밖에서 파일로 열었을 때. 이 브라우저 안에서만 저장, AI 없이 규칙대로만 동작 ---------- */
@@ -69,7 +89,8 @@ async function supaDB(cfg){
   const rooms={};/* code -> {cache:Map(path->data), subs:Set, ch, ready, timer} */
   const roomOf=p=>p.split("/")[1],parentOf=p=>p.split("/").slice(0,-1).join("/");
   const fire=R=>setTimeout(()=>R.subs.forEach(f=>f()),0);
-  async function pull(code,R){const {data,error}=await sb.from("docs").select("path,data").eq("room",code);if(error||!data)return;const m=new Map();data.forEach(d=>m.set(d.path,d.data));R.cache=m;R.ready=true;fire(R)}
+  /* 다시 읽기: 읽기 시작한 뒤에 이 기기가 쓴 문서는 서버에서 온 옛 값으로 덮지 않는다 (상태를 바꾼 직후 되돌아가던 문제) */
+  async function pull(code,R){const t0=Date.now();const {data,error}=await sb.from("docs").select("path,data").eq("room",code);if(error||!data)return;const m=new Map();data.forEach(d=>m.set(d.path,d.data));if(R.wrote)for(const [p,at] of R.wrote)if(at>=t0&&R.cache.has(p))m.set(p,R.cache.get(p));R.cache=m;R.ready=true;fire(R)}
   function open(code){
     let R=rooms[code];if(R)return R;
     R=rooms[code]={cache:new Map(),subs:new Set(),ready:false};
@@ -78,7 +99,7 @@ async function supaDB(cfg){
     return R;
   }
   function close(code){const R=rooms[code];if(!R||R.subs.size)return;clearInterval(R.timer);try{sb.removeChannel(R.ch)}catch(e){}delete rooms[code]}
-  const local=(p,v)=>{const R=rooms[roomOf(p)];if(R){R.cache.set(p,v);fire(R)}};
+  const local=(p,v)=>{const R=rooms[roomOf(p)];if(R){R.cache.set(p,v);(R.wrote||(R.wrote=new Map())).set(p,Date.now());fire(R)}};
   const snapOf=(p,d)=>({exists:d!==undefined&&d!==null,id:p.split("/").pop(),data:()=>clone(d)});
   const doc=p=>({id:p.split("/").pop(),
     get:async()=>{const {data,error}=await sb.from("docs").select("data").eq("path",p).maybeSingle();if(error)throw error;return snapOf(p,data?data.data:undefined)},
@@ -119,8 +140,8 @@ async function createRoom(seat,demo){
     const c1=(route,ev,reason,checks)=>({route,ai_route:route,evidence_ids:ev,missing_fields:[],reason,checks,conflict:false});
     await R("d1",{from:"A",to:"B",kind:"do",text:"방에서 10분만 통화할게",draft:"방에서 10분만 통화할게",facts:["방에서 통화","밤 10시","10분"],ts:t-3*D,stage:"direct",c1:c1("covered_by_agreement",["s2"],"통화 카드에서 둘 다 괜찮다고 했고 시간 조건 안이에요.",["근거 카드 둘 다 O, 조건 확인 통과"])});
     await R("d2",{from:"B",to:"A",kind:"do",text:"토요일 낮에 친구 잠깐 데려와도 돼?",draft:"토요일 낮에 친구 잠깐 데려와도 돼?",facts:["친구 방문","토요일 낮","1시간"],ts:t-2*D,stage:"done",reply:{choice:"cond",note:"6시 전에만 가면 돼",at:t-2*D+6e5},c1:c1("coordination_needed",["s4"],"친구 카드를 한 명만 정해서 물어봐야 해요.",[])});
-    await R("d3",{from:"A",to:"B",kind:"do",text:"화요일 아침 8시에 방에서 과외해도 돼?",draft:"화요일 아침 8시에 방에서 과외해도 돼?",facts:["방에서 과외","화요일 8시","1시간"],ts:t-1.5*D,stage:"agreed",reply:{choice:"hard",note:"9시 전엔 자고 있어",at:t-1.5*D+6e5},constraints:{},consDone:{A:true,B:true},round:1,version:1,picks:{A:{i:0,v:1},B:{i:0,v:1}},options:[{option_id:"o1",action:"9시 전 과외는 스터디룸에서",time_place:"평일 아침, 1층 스터디룸",adjustments_by_person:{A:"장소를 옮김",B:""},constraint_ids:[],open_questions:[]},{option_id:"o2",action:"과외를 9시로 미루기",time_place:"9시, 방",adjustments_by_person:{A:"시간을 미룸",B:""},constraint_ids:[],open_questions:[]}],c1:c1("coordination_needed",[],"방에서 하는 과외는 정해둔 카드가 없어서 물어봐야 해요.",["근거 카드가 없음"])});
-    await db.doc(`rooms/${c}/agreements/g1`).set({text:"아침 9시 전 과외는 1층 스터디룸에서 해요.",option:{option_id:"o1",action:"9시 전 과외는 스터디룸에서",time_place:"평일 아침, 1층 스터디룸",adjustments_by_person:{A:"장소를 옮김",B:""}},version:1,adjust:{A:true,B:false},from:"d3",ts:t-1.4*D,until:t+5.6*D,review_date:"",state:"on",replaces:null});
+    await R("d3",{from:"A",to:"B",kind:"do",text:"화요일 아침 8시에 방에서 과외해도 돼?",draft:"화요일 아침 8시에 방에서 과외해도 돼?",facts:["방에서 과외","화요일 8시","1시간"],ts:t-1.5*D,stage:"agreed",reply:{choice:"hard",note:"9시 전엔 자고 있어",at:t-1.5*D+6e5},constraints:{},consDone:{A:true,B:true},round:1,version:1,picks:{A:{i:0,v:1},B:{i:0,v:1}},options:[{option_id:"o1",action:"9시 전 과외는 스터디룸에서",time_place:"평일 아침, 1층 스터디룸",adjustments_by_person:{A:"장소를 옮김",B:""},gains_by_person:{A:"평일 8시 과외 시간은 그대로",B:"9시 전엔 방이 조용함"},constraint_ids:[],open_questions:[]},{option_id:"o2",action:"과외를 9시로 미루기",time_place:"평일 9시, 방",adjustments_by_person:{A:"시간을 미룸",B:""},gains_by_person:{A:"방에서 그대로 과외",B:"9시 전엔 방이 조용함"},constraint_ids:[],open_questions:[]}],c1:c1("coordination_needed",[],"방에서 하는 과외는 정해둔 카드가 없어서 물어봐야 해요.",["근거 카드가 없음"])});
+    await db.doc(`rooms/${c}/agreements/g1`).set({text:"아침 9시 전 과외는 1층 스터디룸에서",option:{option_id:"o1",action:"9시 전 과외는 스터디룸에서",time_place:"평일 아침, 1층 스터디룸",adjustments_by_person:{A:"장소를 옮김",B:""},gains_by_person:{A:"평일 8시 과외 시간은 그대로",B:"9시 전엔 방이 조용함"}},version:1,adjust:{A:true,B:false},from:"d3",ts:t-1.4*D,until:t+5.6*D,review_date:"",state:"on",replaces:null});
   }catch(e){console.error("demo seed",e)}
   }
   await enter(c,seat);
@@ -139,20 +160,22 @@ async function enter(c,seat){
   const md=md0;if(!md.members?.[seat]||dv[seat]!==D)await db.doc("rooms/"+c).update({members:{...(md.members||{}),[seat]:true},devices:{...dv,[seat]:D}});
   unsubs.forEach(u=>u());unsubs=[];
   const onErr=e=>{if(e?.code==="revoked"){S.err="이 방에 접근할 수 없게 됐어요.";render()}};
-  unsubs.push(db.doc("rooms/"+c).onSnapshot(d=>{S.room=d.data()||null;render()},onErr));
+  unsubs.push(db.doc("rooms/"+c).onSnapshot(d=>{S.room=d.data()||null;render();background()},onErr));
   unsubs.push(db.collection(`rooms/${c}/cards`).orderBy("createdAt").onSnapshot(q=>{S.cards=q.docs.map(d=>({id:d.id,...d.data()}));render()},onErr));
-  unsubs.push(db.collection(`rooms/${c}/requests`).orderBy("ts","desc").limit(60).onSnapshot(q=>{S.reqs=q.docs.map(d=>({id:d.id,...d.data()}));render();background()},onErr));
+  unsubs.push(db.collection(`rooms/${c}/requests`).orderBy("ts","desc").limit(60).onSnapshot(q=>{S.reqs=q.docs.map(d=>normReq({id:d.id,...d.data()}));
+    if(S.flow?.k==="delivered"&&S.flow.id&&["replied","cancelled","done"].includes(findReq(S.flow.id)?.stage))S.flow=null;
+    render();background()},onErr));
   unsubs.push(db.collection(`rooms/${c}/agreements`).orderBy("ts","desc").limit(40).onSnapshot(q=>{S.agrs=q.docs.map(d=>({id:d.id,...d.data()}));render()},onErr));
   render();
 }
-function leave(){unsubs.forEach(u=>u());unsubs=[];S={...S,code:null,seat:null,room:null,cards:[],reqs:[],agrs:[],flow:null,route:{name:"home"}};ls("room","");ls("seat","");render()}
+function leave(){if(S.code)ls("lastRoom",S.code);S.confirmLeave=false;unsubs.forEach(u=>u());unsubs=[];S={...S,code:null,seat:null,room:null,cards:[],reqs:[],agrs:[],flow:null,route:{name:"home"}};ls("room","");ls("seat","");render()}
 async function setStatus(v){
-  const st={...(S.room?.status||{})};st[S.seat]=v;await roomRef().update({status:st});announce("내 상태: "+ST[v]);
+  await mergeIn(roomRef(),{status:{[S.seat]:v}});announce("내 상태: "+ST[v]);
   if(v!=="sleep")for(const r of S.reqs)if(r.to===S.seat&&r.stage==="queued")await reqRef(r.id).update({stage:"delivered",deliveredAt:Date.now()});
 }
-async function setTone(k){await roomRef().update({tones:{...(S.room?.tones||{}),[S.seat]:k}})}
+async function setTone(k){await mergeIn(roomRef(),{tones:{[S.seat]:k}})}
 function todayKey(){const d=now();return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`}
-async function countToday(){const k=todayKey();const d={...(S.room?.daily||{})};const cur=d[k]?.[S.seat]||0;if(cur>=DAY_LIMIT)return false;d[k]={...(d[k]||{}),[S.seat]:cur+1};for(const key of Object.keys(d))if(key!==k)delete d[key];await roomRef().update({daily:d});return true}
+async function countToday(){const k=todayKey();const d={...(((await roomRef().get()).data()||{}).daily||{})};const cur=d[k]?.[S.seat]||0;if(cur>=DAY_LIMIT)return false;d[k]={...(d[k]||{}),[S.seat]:cur+1};for(const key of Object.keys(d))if(key!==k)delete d[key];await roomRef().update({daily:d});return true}
 
 /* ---------- 프롬프트 (보고서 05 프롬프트 설계와 같은 문장) ---------- */
 const SYS=`너는 룸메이트 간 생활 조율을 돕는 촉진자다.
@@ -198,7 +221,7 @@ covered_by_agreement, clarification_needed, coordination_needed 중 하나를 �
 [예시] "내일 저녁 7시에 방에서 10분 통화해도 돼?" + 카드 "s2 | 밤에 방에서 통화 | A: O (23시 전) | B: O (15분 이내)" → {"kind":"permission","route":"covered_by_agreement","evidence_ids":["s2"],"hour":19,"minutes":10,"reason":"통화 카드에서 둘 다 괜찮다고 했어요."}
 "방에서 통화 좀 할게" + 같은 카드 → {"kind":"permission","route":"clarification_needed","evidence_ids":["s2"],"missing_fields":["duration"],"clarification":"통화는 몇 분쯤 할 거예요?","reason":"얼마나 걸리는지 알아야 해요."}
 "친구 자고 가도 돼?" + 카드 "r0 | 기숙사 규칙 | 외부인 방에서 자고 가기" → {"kind":"permission","route":"coordination_needed","evidence_ids":["r0"],"reason":"기숙사 규칙에 걸리는 일이에요."}
-[구현 추가 필드] kind: 요청자가 자기가 하려는 일의 허락을 구하면 "permission", 상대가 하는 일을 바꿔 달라는 부탁이나 불편이면 "request". request면 카드 비교 없이 route는 coordination_needed. clarification: missing_fields가 있으면 요청자에게 물을 질문 하나. hour: 시작 시각 0-23(지금이면 현재 시각). minutes: 걸리는 분, 모르면 null. weekend: 주말이면 true. reason: 요청자가 읽을 해요체 한 문장, 30자 이내. reason 문장 안에서는 카드 id를 쓰지 말고 카드 제목으로 말한다. unsafe: 위협이나 괴롭힘이면 true.
+[구현 추가 필드] kind: 요청자가 자기가 하려는 일의 허락을 구하면 "permission", 상대가 하는 일을 바꿔 달라는 부탁이나 불편이면 "request". request면 카드 비교 없이 route는 coordination_needed. clarification: missing_fields가 있으면 요청자에게 물을 질문 하나. action: 짧은 행동. 요청자 이름은 넣지 않는다(예: "방에서 과외하기"). 상대의 물건이나 자리를 말할 때만 "상대", "너", "네" 대신 상대 이름(${S.room?.names?.[other()]||other()})을 쓴다(예: "${S.room?.names?.[other()]||other()} 침대에 앉기"). time, duration: 요청에 적힌 말만 짧게 쓰고, 적히지 않았으면 빈 문자열(지어내지 않는다). hour: 시작 시각 0-23(적히지 않았거나 지금이면 현재 시각). minutes: 걸리는 분, 모르면 null. weekend: 주말이면 true. reason: 요청자가 읽을 해요체 한 문장, 30자 이내. reason 문장 안에서는 카드 id를 쓰지 말고 카드 제목으로 말한다. unsafe: 위협이나 괴롭힘이면 true.
 [요청자] ${S.seat} / [상대] ${other()} (상대가 직접 설정한 상태: ${ST[st[other()]]||"모름"})
 [현재 시각] ${["일","월","화","수","목","금","토"][d.getDay()]}요일 ${hhmm(d)}
 [허용 카드] (O = 안 물어봐도 됨, X = 물어봐줘)
@@ -223,7 +246,7 @@ async function C2(req){
 지금 답할 사람은 ${me_} 한 명이다. ${me_}에게만 보이는 짧은 질문을 한두 개 만든다.
 [${me_}의 역할] ${role}
 ${guide}
-[규칙] 질문 예의 틀을 이 일의 내용(시간, 장소, 행동)에 맞게 고쳐 쓴다. 이미 아는 정보는 다시 묻지 않는다. 상대의 비공개 답변을 드러내지 않는다. 짧은 반말 한 문장씩, 최대 2개.
+[규칙] 질문 예의 틀을 이 일의 내용(시간, 장소, 행동)에 맞게 고쳐 쓴다. 이미 아는 정보는 다시 묻지 않는다. 특히 shared_case의 답 괄호 안에 ${me_}가 이미 적은 내용(예: "9시 전엔 자고 있어")은 다시 묻지 말고, 그다음을 묻는다. 상대의 비공개 답변을 드러내지 않는다. 짧은 반말 한 문장씩, 최대 2개.
 ${data("shared_case",`${S.room?.names?.[req.from]||req.from}의 ${req.kind==="do"?"요청":"부탁"}: ${req.draft||req.text}\n${S.room?.names?.[req.to]||req.to}의 답: 이번엔 어려워요${req.reply?.note?" ("+req.reply.note+")":""}`)}
 [출력] {"questions":["반말 질문 1-2개"],"unresolved_fields":[]}`);
 }
@@ -249,6 +272,7 @@ async function C4(req,prev){
 각 대안은 {option_id, action, time_place, adjustments_by_person, constraint_ids, open_questions}로 작성하라.
 모든 필수 조건을 지켜라. 가능한 안이 없으면 억지 타협안을 만들지 말고 clarification_needed를 반환하라.
 각자 무엇을 조정하는지 보여라. 확인된 조정 이력은 순서 설명에만 쓰고 빚이나 잘못 점수로 환산하지 마라.
+[구현 추가] time_place에는 "내일", "오늘" 같은 한 번뿐인 날 대신 되풀이되는 때(예: "평일 아침 8시, 1층 스터디룸")를 쓴다. adjustments_by_person에는 그 사람이 바꾸거나 양보하는 행동만 쓴다(예: "방 대신 스터디룸에서 과외"). 얻는 것이나 지켜지는 것은 여기에 쓰지 않는다. 바꾸는 게 없는 사람은 반드시 빈 문자열이다. gains_by_person에는 각자 이 안에서 지켜지는 것(공유된 조건 중)을 한 줄씩 쓴다. 맞추는 것이 없는 사람도 얻는 것은 쓴다. 이름이나 A, B 글자 없이 내용만.
 당사자를 대신해 선택하거나 이미 합의됐다고 말하지 마라.
 ${data("shared_case",`${req.from}의 ${req.kind==="do"?"요청":req.kind==="review"?"합의 다시 보기":"부탁"}: ${req.draft||req.text}`)}
 ${data("share_approved_constraints",sh.length?sh.map(c=>`${c.id} | ${c.owner_id} | ${c.condition} | ${c.flexibility}`).join("\n"):"(공유된 조건 없음)")}
@@ -256,15 +280,15 @@ ${data("share_approved_constraints",sh.length?sh.map(c=>`${c.id} | ${c.owner_id}
 [저장된 기록에서 읽은, 이미 같이 만든 카드] (이 카드들과 어긋나는 대안은 내지 마라)
 ${S.agrs.filter(x=>x.state!=="off").map(x=>"- "+x.text).join("\n")||"(없음)"}
 ${prev?.length?data("both_found_hard",prev.map(o=>o.action).join("\n")):""}
-[출력] {"status":"ok|clarification_needed","options":[{"option_id":"o1","action":"짧은 방법","time_place":"","adjustments_by_person":{"A":"${S.room?.names?.A||"A"}가 맞출 것(이름이나 A, B 글자 없이 행동만), 없으면 빈 문자열","B":""},"constraint_ids":[],"open_questions":[]}]}`);
+[출력] {"status":"ok|clarification_needed","options":[{"option_id":"o1","action":"짧은 방법","time_place":"","adjustments_by_person":{"A":"${S.room?.names?.A||"A"}가 맞출 것(이름이나 A, B 글자 없이 행동만), 없으면 빈 문자열","B":""},"gains_by_person":{"A":"이 안에서 ${S.room?.names?.A||"A"}에게 지켜지는 것","B":""},"constraint_ids":[],"open_questions":[]}]}`);
 }
 async function C6(req,opt){
   const rd=new Date(Date.now()+7*864e5);
   return ask(`${SYS}
 [C6 · 합의 내용의 확정]
 두 참여자가 승인한 동일한 대안 버전으로 간결한 합의문 초안을 작성하라.
-누가 무엇을 언제 어디서 하는지를 카드에 쓸 한 문장(40자 이내)으로 쓴다. 사람은 이름으로 쓴다(A는 ${S.room?.names?.A||"A"}, B는 ${S.room?.names?.B||"B"}). "A", "B"라고 쓰지 않는다.
-"내일", "오늘", 날짜처럼 한 번뿐인 때는 쓰지 않고 앞으로 1주 동안 되풀이해 쓸 수 있는 규칙으로 쓴다(예: "아침 9시 전 과외는 1층 스터디룸에서 해요."). 체험 기간과 검토일은 앱이 따로 보여주므로 문장에 넣지 않는다.
+누가 무엇을 언제 어디서 하는지를 카드 제목처럼 짧은 규칙 꼴(30자 이내, 예: "아침 9시 전 과외는 1층 스터디룸에서")로 쓴다. "앞으로 1주 동안", "~해요." 같은 기간이나 맺음말 없이 쓴다. 사람은 이름으로 쓴다(A는 ${S.room?.names?.A||"A"}, B는 ${S.room?.names?.B||"B"}). "A", "B"라고 쓰지 않는다.
+"내일", "오늘", 날짜처럼 한 번뿐인 때는 쓰지 않고 1주 동안 되풀이해 쓸 수 있는 규칙으로 쓴다. 체험 기간과 검토일은 앱이 따로 보여주므로 문장에 넣지 않는다.
 승인된 조건을 유지하라. 의무를 추가하거나 침묵을 동의로 해석하지 마라.
 각자가 밝힌 조정 내용은 인정하되 도덕적 공로를 매기지 마라.
 두 승인이 같은 버전을 가리키지 않으면 pending_confirmation을 반환하라.
@@ -286,7 +310,8 @@ async function C7(req){
 ${data("resolved_case",`id: ${req.id}\n${req.from}의 ${req.kind==="do"?"요청":"부탁"}: ${req.draft||req.text}\n결과: ${req.reply?.choice==="ok"?"괜찮다고 함":req.reply?.choice==="cond"?"조건부로 괜찮음: "+(req.reply.note||""):"이번엔 어려워요"}`)}
 [기존 카드]
 ${S.cards.map(cardLine).join("\n")}
-[출력] {"status":"proposal|no_proposal","proposed_card":{"category":"소리|빛|방 사용|사람|물건|온도","title":"14자 이내 상황","conditions":"","exceptions":""},"rationale":"","source_case_id":"${req.id}"}`,"quick");
+[제목 규칙] 카드는 앱에서 "룸메가 이걸 하고 싶을 때, 먼저 물어봐줘 / 그냥 해도 돼"로 쓰인다. 그래서 title은 누군가 하고 싶은 행동으로 쓴다(예: "아침에 방에서 드라이기 쓰기"). "제한", "금지", "줄이기" 같은 말을 넣지 않는다. 조건은 conditions에.
+[출력] {"status":"proposal|no_proposal","proposed_card":{"category":"소리|빛|방 사용|사람|물건|온도","title":"14자 이내 행동","conditions":"","exceptions":""},"rationale":"","source_case_id":"${req.id}"}`,"quick");
 }
 async function TONE(req,seat){
   const t=tone(seat)||TONES.soft,nA=(S.room?.names?.[req.from])||req.from,nB=(S.room?.names?.[seat])||seat;
@@ -295,7 +320,7 @@ async function TONE(req,seat){
 [전달 말투 · 구현 추가 호출]
 ${nA}가 승인한 문장을 ${nB}가 듣기 편한 말투의 한 문장으로 바꾼다. 화면에 이미 "${nA}가 ${fyi?"알려왔어요":ask_?"부탁해요":"물어봐요"}"라고 나오므로, 그 아래에 올 내용 문장만 쓴다. 말투보다 정확성이 먼저다.
 [말투] ${t.style}
-[규칙] 사실(시간, 장소, 행동, 조건)은 빠뜨리거나 바꾸지 않는다. 새 사실이나 감정을 더하지 않는다. 룸메끼리 쓰는 반말로 쓴다. 이름("${nA}", "${nB}"), "A", "B" 같은 기호, "물어봐요", "부탁해요", "~래요", "~라고 전했다" 같은 전달 표현은 넣지 않는다. ${fyi?"허락을 구하는 질문이 아니라 알리는 문장으로 끝낸다(예: \"~할게.\").":ask_?"부탁하는 문장으로 끝낸다.":"괜찮은지 묻는 문장으로 끝낸다."}
+[규칙] 사실(시간, 장소, 행동, 조건)은 빠뜨리거나 바꾸지 않는다. 새 사실이나 감정을 더하지 않는다. 승인 문장에 없는 때("지금", "오늘", "내일")를 붙이지 않는다. 보낸 사람이 겪는 일이면 "내가"처럼 주어를 밝혀 누가 겪는지 헷갈리지 않게 한다. "혹시" 같은 쿠션어는 부탁하는 말 바로 앞에 한 번만 쓴다. 룸메끼리 쓰는 반말로 쓴다. 이름("${nA}", "${nB}"), "A", "B" 같은 기호, "물어봐요", "부탁해요", "~래요", "~라고 전했다" 같은 전달 표현은 넣지 않는다. ${fyi?"허락을 구하는 질문이 아니라 알리는 문장으로 끝낸다(예: \"~할게.\").":ask_?"부탁하는 문장으로 끝낸다.":"괜찮은지 묻는 문장으로 끝낸다."}
 [예시] 승인 문장 "내일 아침 8시에 방에서 과외 1시간 해도 돼?" → 부드럽게: "혹시 내일 아침 8시에 방에서 1시간쯤 과외해도 괜찮을까?" / 직설적으로: "내일 아침 8시, 방에서 과외 1시간. 괜찮아?"${fyi?` / 알림일 때: "내일 아침 8시에 방에서 과외 1시간 할게."`:""}
 ${data("approved_text",req.draft||req.text)}
 ${data("key_facts",(req.facts||[]).join(", "))}
@@ -336,7 +361,7 @@ function verify(r){
   out.checks.push(out.trial&&!cards.length?"둘 다 승인한 체험 카드, 기간 안":"근거 카드 둘 다 O, 조건 확인 통과");
   return out;
 }
-const deliverStage=()=>(S.room?.status?.[other()]==="sleep")?"queued":"delivered";
+const deliverStage=()=>(!joined(other())||S.room?.status?.[other()]==="sleep")?"queued":"delivered";
 
 /* ---------- 흐름 ---------- */
 async function submitSay(text,asked,forceKind){
@@ -377,10 +402,12 @@ async function sendAsk(draft,facts){
 async function background(){
   if(!S.code)return;
   for(const r of S.reqs){
+    if(r.to===S.seat&&r.stage==="queued"&&S.room&&S.room.status?.[S.seat]!=="sleep"&&joined(S.seat)&&!S.busy.has("w"+r.id)){S.busy.add("w"+r.id);try{await reqRef(r.id).update({stage:"delivered",deliveredAt:Date.now()})}catch(e){}S.busy.delete("w"+r.id)}
     if(sample&&r.to===S.seat&&["delivered","fyi"].includes(r.stage)&&!r.translations?.[S.seat]&&!S.busy.has(r.id)){
-      S.busy.add(r.id);try{const t=await TONE(r,S.seat);if(t)await reqRef(r.id).update({translations:{...(r.translations||{}),[S.seat]:t}})}catch(e){}S.busy.delete(r.id);render();
+      S.busy.add(r.id);try{const t=await TONE(r,S.seat);if(t)await mergeIn(reqRef(r.id),{translations:{[S.seat]:t}})}catch(e){}S.busy.delete(r.id);render();
     }
-    if(r.stage==="constraints"&&r.consDone?.A&&r.consDone?.B&&!S.busy.has("c4"+r.id)&&Date.now()-(r.consAt||0)>(r.from===S.seat?20000:35000)){S.busy.add("c4"+r.id);await runC4(r);S.busy.delete("c4"+r.id)}
+    {const pa=r.picks?.A,pb=r.picks?.B;if(r.stage==="aligning"&&(r.from===S.seat||r.to===S.seat)&&pa&&pb&&pa.v===r.version&&pb.v===r.version&&pa.i===pb.i&&(laterSeat(pa.at,pb.at)===S.seat||(r.from===S.seat&&Date.now()-Math.max(pa.at||0,pb.at||0)>45000)))await finalize(r,pa.i)}
+    if(r.stage==="constraints"&&(r.from===S.seat||r.to===S.seat)&&r.consDone?.A&&r.consDone?.B&&!S.busy.has("c4"+r.id)&&(laterSeat(r.done_A,r.done_B)===S.seat||Date.now()-(r.consAt||0)>45000)){S.busy.add("c4"+r.id);await runC4(r);S.busy.delete("c4"+r.id)}
   }
 }
 async function reply(req,choice,note){await reqRef(req.id).update({stage:"replied",reply:{choice,note:note||"",at:Date.now()}});S.flow=null;announce("답을 전했어요");go("home")}
@@ -396,7 +423,7 @@ async function ackReply(req){
   S.flow={k:"newcard",title:made};render();
 }
 async function startAlign(req){
-  await reqRef(req.id).update({stage:"constraints",constraints:{},consDone:{},round:1,version:0,options:null,picks:{}});
+  await reqRef(req.id).update({stage:"constraints",...CONS_RESET,round:1,version:0,options:null,...PICK_RESET});
   S.flow=null;go("thread",req.id);
 }
 async function loadC2(req){
@@ -415,38 +442,50 @@ async function submitConstraints(req){
   else list=ans.map((a,i)=>({owner_id:S.seat,condition:a,flexibility:"unknown",source_id:"q"+i,sharing_status:shr[i]?"shared":"private"}));
   const shared=list.filter(c=>{const i=+String(c.source_id||"").replace(/\D/g,"");return c.sharing_status==="shared"&&shr[i]===true}).map(c=>{const i=+String(c.source_id||"").replace(/\D/g,"");return {owner_id:S.seat,condition:String(ans[i]||c.condition||"").slice(0,120),flexibility:c.flexibility||"unknown",source_id:c.source_id}});
   for(let i=0;i<ans.length;i++)if(shr[i]&&!shared.some(c=>c.source_id==="q"+i))shared.push({owner_id:S.seat,condition:ans[i].slice(0,120),flexibility:"unknown",source_id:"q"+i});
-  const fresh=findReq(req.id)||req;
-  const next={...fresh,constraints:{...(fresh.constraints||{}),[S.seat]:shared},consDone:{...(fresh.consDone||{}),[S.seat]:true}};
-  await reqRef(req.id).update({constraints:next.constraints,consDone:next.consDone,consAt:Date.now()});
-  if(next.consDone.A&&next.consDone.B&&!S.busy.has("c4"+req.id)){S.busy.add("c4"+req.id);S.flow={k:"thinking",msg:"둘 다 괜찮을 방법을 찾는 중이에요."};render();try{await runC4(next)}finally{S.busy.delete("c4"+req.id)}}
+  // 둘이 거의 동시에 답해도 상대 조건이 지워지지 않게 새로 읽고 내 칸만
+  const doneAt=Date.now();
+  await reqRef(req.id).update({["cons_"+S.seat]:shared,["done_"+S.seat]:doneAt,consAt:doneAt});
+  const next=await freshReq(req.id),iMake=laterSeat(next.done_A,next.done_B)===S.seat;
+  if(iMake&&next.consDone.A&&next.consDone.B&&!S.busy.has("c4"+req.id)){S.busy.add("c4"+req.id);S.flow={k:"thinking",msg:"둘 다 괜찮을 방법을 찾는 중이에요."};render();try{await runC4(next)}finally{S.busy.delete("c4"+req.id)}}
   S.flow=null;render();
 }
 async function runC4(req,prevOpts){
   let o=null;if(sample){try{o=await C4(req,prevOpts)}catch(e){}}
-  const opts=(o?.status==="ok"?(o.options||[]):[]).filter(x=>x.action).slice(0,3).map((x,i)=>({option_id:"o"+(i+1),action:String(x.action),time_place:x.time_place||"",adjustments_by_person:{A:x.adjustments_by_person?.A||"",B:x.adjustments_by_person?.B||""},constraint_ids:x.constraint_ids||[],open_questions:x.open_questions||[]}));
+  const opts=(o?.status==="ok"?(o.options||[]):[]).filter(x=>x.action).slice(0,3).map((x,i)=>({option_id:"o"+(i+1),action:String(x.action),time_place:x.time_place||"",adjustments_by_person:{A:x.adjustments_by_person?.A||"",B:x.adjustments_by_person?.B||""},gains_by_person:{A:x.gains_by_person?.A||"",B:x.gains_by_person?.B||""},constraint_ids:x.constraint_ids||[],open_questions:x.open_questions||[]}));
   const v=(req.version||0)+1;
   if(!opts.length){await reqRef(req.id).update({stage:"blocked",blockReason:"공유된 조건만으로는 둘 다 괜찮은 방법이 나오지 않았어요."});return}
-  await reqRef(req.id).update({stage:"aligning",options:opts,version:v,picks:{}});
+  await reqRef(req.id).update({stage:"aligning",options:opts,version:v,...PICK_RESET});
 }
 async function pick(req,i){
-  const picks={...(req.picks||{}),[S.seat]:{i,v:req.version}};await reqRef(req.id).update({picks});
-  const op=picks[other()];
-  if(op&&op.i===i&&op.v===req.version){
-    const opt=req.options[i];S.flow={k:"thinking",msg:"합의문을 쓰는 중이에요."};render();
-    let c=null;if(sample){try{c=await C6({...req,picks},opt)}catch(e){}}
-    const text=(c?.status==="confirmed"&&c.agreement_text)?c.agreement_text:opt.action;
-    const adj={A:!!opt.adjustments_by_person.A,B:!!opt.adjustments_by_person.B};
-    await db.collection(`rooms/${S.code}/agreements`).add({text,option:opt,version:req.version,adjust:adj,from:req.id,ts:Date.now(),until:Date.now()+7*864e5,review_date:c?.review_date||"",state:"on",seen:{[S.seat]:true},replaces:req.agreementId||null});
-    if(req.agreementId)await db.doc(`rooms/${S.code}/agreements/${req.agreementId}`).update({state:"off",replacedAt:Date.now()});
-    await reqRef(req.id).update({stage:"agreed"});
-    S.flow=null;S.prev=S.route;S.route={name:"home"};S.tab="home";render();S.flow={k:"agreed",text,adj};render();return;
+  // 둘이 거의 동시에 골라도 상대 선택이 지워지지 않게 (지워지면 같은 안을 골라도 합의가 안 생김)
+  await reqRef(req.id).update({["pick_"+S.seat]:{i,v:req.version,at:Date.now()}});
+  req=await freshReq(req.id);const mp=req.picks?.[S.seat],op=req.picks?.[other()];
+  if(mp&&op&&op.i===i&&mp.i===i&&op.v===req.version&&mp.v===req.version){
+    // 둘이 거의 동시에 골라도 카드는 한 기기만: 나중에 고른 쪽 (못 보면 그 기기의 뒷일이 바로 챙김)
+    if(laterSeat(req.picks.A.at,req.picks.B.at)===S.seat){await finalize(req,i);return}
   }
   render();
+}
+// 같은 버전의 같은 안을 둘 다 골랐으면 합의 카드를 만든다. 보통은 나중에 고른 쪽이, 그게 멈추면 뒷일에서 요청한 쪽이
+async function finalize(req,i){
+  if(S.busy.has("fin"+req.id))return;S.busy.add("fin"+req.id);
+  try{
+    const cur=(await reqRef(req.id).get()).data()||{};if(cur.stage!=="aligning")return;
+    const opt=req.options[i];const show=!S.flow||S.flow.k==="thinking";if(show){S.flow={k:"thinking",msg:"합의문을 쓰는 중이에요."};render()}
+    let c=null;if(sample){try{c=await C6({...req},opt)}catch(e){}}
+    const text=(c?.status==="confirmed"&&c.agreement_text)?c.agreement_text:opt.action;
+    const adj={A:!!opt.adjustments_by_person.A,B:!!opt.adjustments_by_person.B};
+    if((((await reqRef(req.id).get()).data()||{}).stage)!=="aligning")return;
+    const ag=await db.collection(`rooms/${S.code}/agreements`).add({text,option:opt,version:req.version,adjust:adj,from:req.id,ts:Date.now(),until:Date.now()+7*864e5,review_date:c?.review_date||"",state:"on",seen:{[S.seat]:true},replaces:req.agreementId||null});
+    if(req.agreementId)await db.doc(`rooms/${S.code}/agreements/${req.agreementId}`).update({state:"off",replacedAt:Date.now()});
+    await reqRef(req.id).update({stage:"agreed"});
+    if(show){S.flow=null;S.prev=S.route;S.route={name:"home"};S.tab="home";render();S.flow={k:"agreed",text,adj,id:ag.id};render()}
+  }finally{S.busy.delete("fin"+req.id)}
 }
 async function noneFit(req){
   const r=(req.round||1)+1;
   if(r>MAX_ROUNDS){await reqRef(req.id).update({stage:"blocked",blockReason:`${MAX_ROUNDS}번 맞춰봤는데 둘 다 괜찮은 방법을 못 찾았어요.`});return}
-  await reqRef(req.id).update({round:r,picks:{}});S.flow={k:"thinking",msg:"다른 방법을 찾는 중이에요."};render();
+  await reqRef(req.id).update({round:r,...PICK_RESET});S.flow={k:"thinking",msg:"다른 방법을 찾는 중이에요."};render();
   await runC4({...req,round:r},req.options);S.flow=null;render();
 }
 async function reviewAgr(a,mode){
@@ -472,9 +511,11 @@ function iconSVG(name,bg){const r=ICONS[name]||ICONS.laptop;return `<svg viewBox
 function dialog(html){return `<div class="dwrap"><div class="nametag px3">${esc(elf().name)}</div><div class="dialog"><div class="dialog-in" aria-live="polite">${html}</div></div></div>`}
 function choices(list){return list.map((c,i)=>`<button class="choice" data-act="${c[0]}" ${c[2]!=null?`data-arg="${esc(c[2])}"`:""}><span class="m ${i===0?"blink":""}" aria-hidden="true">${i===0?"▶":""}</span>${esc(c[1])}</button>`).join("")}
 const factChips=f=>(f&&f.length)?`<div class="chips" aria-label="꼭 전해야 하는 내용">${f.map(x=>`<span class="cchip fact">${esc(x)}</span>`).join("")}</div>`:"";
-const replyLine=(seat,choice,note)=>((REPLY_LINE[toneKey(seat)]||REPLY_LINE.soft)[choice]||"")+(note?`\n"${note}"`:"");
+const replyLine=(seat,choice,note,kind)=>(((kind==="ask"?REPLY_LINE_ASK:REPLY_LINE)[toneKey(seat)]||REPLY_LINE.soft)[choice]||"")+(note?`\n"${note}"`:"");
+const replySelf=(kind,choice,note)=>(REPLY_SELF[kind==="ask"?"ask":"do"][choice]||"")+"."+(note?`\n${note}`:"");
+const replyBtns=(r,col)=>{const R=REPLY_SELF[r.kind==="ask"?"ask":"do"];return [["rOk",R.ok],["rCond",R.cond],["rHard",R.hard]].map(([a,l],i)=>col?`<button class="btn ${i===0?"main ":""}px4" data-act="${a}" data-arg="${r.id}">${l}</button>`:[a,l,r.id])};
 function header(title,back){return `<div class="hdr">${back?`<button class="hbtn px3" data-act="back" aria-label="뒤로">←</button>`:""}<h1 class="ttl" style="margin:0;flex:1">${esc(title)}</h1>${back?"":`<button class="hbtn px3" data-act="go" data-arg="me" aria-label="설정">⚙</button>`}</div>`}
-function go(name,id){if(S.route.name!==name||S.route.id!==id)S.prev=S.route;S.route={name,id};if(["home","letters","cards"].includes(name))S.tab=name;if(name==="sort")S.tab="cards";S.flow=null;render();const h=$(".page h1");if(h){h.setAttribute("tabindex","-1");h.focus()}}
+function go(name,id){S.confirmLeave=false;if(S.route.name!==name||S.route.id!==id)S.prev=S.route;S.route={name,id};if(["home","letters","cards"].includes(name))S.tab=name;if(name==="sort")S.tab="cards";S.flow=null;render();const h=$(".page h1");if(h){h.setAttribute("tabindex","-1");h.focus()}}
 
 /* ---------- 할 일 찾기 ---------- */
 function todoFor(r){const me=S.seat;
@@ -506,64 +547,97 @@ function homeView(){
   else if(f?.k==="clarify"){body=`<p class="say">${esc(f.q)}</p><label class="vh" for="clT">답</label><input id="clT" class="input" maxlength="60" placeholder="예: 20분 정도"><div class="row"><button class="btn px4" data-act="skipClarify">모르겠어</button><button class="btn main px4" data-act="sendClarify">알려주기</button></div>`}
   else if(f?.k==="pickKind"){body=`<p class="say">어느 쪽이에요?</p>${choices([["kindDo","내가 하려는 일이야"],["kindAsk",nm(o)+"에게 바라는 일이야"],["cancel","취소"]])}`}
   else if(f?.k==="askConfirm"){body=`<p class="say">이렇게 전할게요. 고쳐도 돼요.${f.ai?`\n처음 적은 말은 ${nm(o)}에게 안 보여요.`:""}</p><label class="vh" for="askF">보낼 문장</label><textarea id="askF" class="input" rows="3">${esc(f.draft)}</textarea>${factChips(f.facts)}<div class="row"><button class="btn px4" data-act="cancel">보내지 않기</button><button class="btn main px4" data-act="confirmAsk">이 문장으로 보내기</button></div>`}
-  else if(f?.k==="direct"){const ev=(f.r.evidence_ids||[]).map(id=>evTitle(id))[0];body=`<p class="say">해도 돼요.${ev?`\n"${esc(ev)}" 카드에서 둘 다 괜찮다고 했어요.`:""}${f.r.notify?`\n${nm(o)}에게 알림만 남길게요.`:""}</p>${choices([["ok","고마워"],["wrong","그래도 "+nm(o)+"에게 물어봐줘",f.id]])}`}
-  else if(f?.k==="delivered"){pose="letter";mx=me==="A"?258:134;my=215;body=`<p class="say">${nm(o)}에게 ${f.r?.route==="ask"?"전할게요":"물어볼게요"}.${f.queued?`\n자는 중이라 일어나면 전할게요.`:""}</p>${choices([["ok","알겠어"]])}`}
-  else if(f?.k==="rule"){pose="bow";const ev=(f.r?.evidence_ids||[]).map(id=>evTitle(id)).filter(Boolean)[0];body=`<p class="say">이건 둘이 정할 수 있는 일이 아니에요.${ev?`\n기숙사 규칙에 걸려요: "${esc(ev)}"`:"\n기숙사 규칙에 걸려요."}\n${nm(o)}에게는 전하지 않았어요.</p>${choices([["ok","알겠어"]])}`}
-  else if(f?.k==="unsafe"){pose="bow";body=`<p class="say">이 내용은 전하지 않을게요. 요정이 맞춰줄 수 있는 일이 아닌 것 같아요.\n위험하거나 괴롭힘을 느낀다면 기숙사 사감실이나 학생상담센터에 꼭 이야기해주세요.</p>${choices([["ok","알겠어"]])}`}
+  else if(f?.k==="direct"){const id0=(f.r.evidence_ids||[])[0],isG=String(id0||"").startsWith("g_"),ev=id0?evTitle(id0):"";body=`<p class="say">해도 돼요.${ev?(isG?`\n둘이 같이 만든 카드에 있어요.\n"${esc(nameT(ev))}"`:`\n"${esc(ev)}" 카드에서 둘 다 괜찮다고 했어요.`):""}${f.r.notify?`\n${nm(o)}에게는 알림만 남길게요.`:""}</p>${choices([["ok","고마워"],["wrong","그래도 "+nm(o)+"에게 물어봐줘",f.id]])}`}
+  else if(f?.k==="delivered"){pose="letter";mx=me==="A"?258:134;my=215;body=`<p class="say">${nm(o)}에게 ${f.r?.route==="ask"?"전할게요":"물어볼게요"}.${!joined(o)?`\n룸메가 방에 들어오면 전할게요.`:f.queued?`\n자는 중이라 일어나면 전할게요.`:""}</p>${choices([["ok","알겠어"]])}`}
+  else if(f?.k==="rule"){pose="bow";const ev=(f.r?.evidence_ids||[]).map(id=>evTitle(id)).filter(Boolean)[0];body=`<p class="say">이건 둘이 정할 수 있는 일이 아니에요.${ev?`\n기숙사 규칙에 걸려요: "${esc(ev)}"`:"\n기숙사 규칙에 걸려요."}\n${nm(o)}에게는 전하지 않았어요. 꼭 필요하면 기숙사 사감실에 물어봐요.</p>${choices([["ok","알겠어"]])}`}
+  else if(f?.k==="unsafe"){pose="bow";body=`<p class="say">이 말은 ${nm(o)}에게 전하지 않을게요.\n많이 속상했나 봐요. 바라는 걸 한 가지만 적어주면 전할 수 있는 말로 같이 다듬어볼게요.\n둘 사이가 위험하다고 느껴지면 기숙사 사감실이나 학생상담센터에 이야기해요.</p>${choices([["ok","알겠어"]])}`}
   else if(f?.k==="limit"){pose="bow";body=`<p class="say">오늘은 많이 보냈어요. 남은 건 내일 하거나 직접 얘기해봐요.</p>${choices([["ok","알겠어"]])}`}
   else if(f?.k==="newcard"){body=`<p class="say">${f.title?`새 카드를 제안해요.\n"${esc(f.title)}"`:"이번 일은 여기까지예요."}</p>${choices(f.title?[["toCards","카드 보러 가기"],["ok","나중에"]]:[["ok","좋아"]])}`}
-  else if(f?.k==="agreed"){body=`<p class="say">둘 다 같은 안을 골랐어요. 카드로 만들었어요.\n"${esc(f.text)}"</p>${choices([["ok","좋아"]])}`}
-  else if(!f&&newAgr){body=`<p class="say">둘 다 같은 안을 골랐어요. 카드로 만들었어요.\n"${esc(newAgr.text)}"</p>${choices([["seenAgr","좋아",newAgr.id],["go","카드 보기","agr|"+newAgr.id]])}`}
+  else if(f?.k==="agreed"){body=`<p class="say">둘 다 같은 안을 골랐어요. 카드로 만들었어요.\n"${esc(nameT(f.text))}"\n1주 해보고 어땠는지 물어볼게요.</p>${choices([["ok","좋아"]].concat(f.id?[["go","카드 보기","agr|"+f.id]]:[]))}`}
+  else if(!f&&newAgr){body=`<p class="say">둘 다 같은 안을 골랐어요. 카드로 만들었어요.\n"${esc(nameT(newAgr.text))}"\n1주 해보고 어땠는지 물어볼게요.</p>${choices([["seenAgr","좋아",newAgr.id],["go","카드 보기","agr|"+newAgr.id]])}`}
   else if(f?.k==="wrongDone"){pose="bow";body=`<p class="say">제가 잘못 읽었어요. ${nm(o)}에게 물어볼게요.</p>${choices([["ok","괜찮아"]])}`}
-  else if(incoming){const t=incoming.translations?.[me];pose="letter";body=`<p class="say">${nm(incoming.from)}가 ${incoming.kind==="do"?"물어봐요":"부탁해요"}.\n${t?esc(t):esc(incoming.draft)+(S.busy.has(incoming.id)?"\n(내 말투로 바꾸는 중)":"")}</p>${factChips(incoming.facts)}<label class="vh" for="noteT">조건이나 한마디</label><input id="noteT" class="input" maxlength="60" placeholder="조건이나 한마디 (선택)">${choices([["rOk","응, 괜찮아",incoming.id],["rCond","조건 있으면 괜찮아",incoming.id],["rHard","이번엔 어려워요",incoming.id]])}`}
-  else if(fyi){body=`<p class="say">${nm(fyi.from)}가 알려왔어요. 답은 안 해도 돼요.\n${esc(fyi.translations?.[me]||fyi.draft)}</p>${factChips(fyi.facts)}${choices([["fyiOk","확인했어",fyi.id]])}`}
-  else if(replied){const c=replied.reply.choice;body=`<p class="say">${nm(o)}의 답이에요.\n${esc(replyLine(me,c,replied.reply.note))}</p>${choices(c==="hard"?[["align","같이 맞춰보기",replied.id],["ack","다음에 할게",replied.id]]:[["ack","알겠어",replied.id]])}`}
-  else if(cons){pose="sniff";body=`<p class="say">맞춰보기 전에 따로 몇 가지만 물어볼게요.\n${nm(o)}는 이 답을 못 봐요.</p>${choices([["go","답하러 가기","thread|"+cons.id]])}`}
-  else if(aligning){const p=aligning.picks?.[me];pose="wobble";body=`<p class="say">대안이 나왔어요.${aligning.picks?.[me]?.v===aligning.version?`\n${nm(o)}가 고르는 중이에요.`:""}</p>${choices([["go","대안 보러 가기","thread|"+aligning.id]])}`}
+  else if(incoming){const t=incoming.translations?.[me],late=(incoming.deliveredAt||incoming.ts)-incoming.ts>30*60e3;pose="letter";body=`<p class="say">${nm(incoming.from)}가 ${incoming.kind==="do"?"물어봐요":"부탁해요"}.${late?` (${esc(when(incoming.ts))}에 보낸 편지)`:""}\n${t?esc(nameT(t)):esc(incoming.draft)+(S.busy.has(incoming.id)?"\n(내 말투로 바꾸는 중)":"")}</p>${factChips(incoming.facts)}<label class="vh" for="noteT">조건이나 한마디</label><input id="noteT" class="input" maxlength="60" placeholder="${incoming.kind==="ask"?"조건이나 한마디 (선택)":"조건이나 한마디 (선택, 예: 11시 전까지만)"}">${choices(replyBtns(incoming))}`}
+  else if(fyi){body=`<p class="say">${nm(fyi.from)}가 알려왔어요. 둘이 정해둔 카드 안이라 답은 안 해도 돼요.\n${esc(nameT(fyi.translations?.[me]||fyi.draft))}</p>${factChips(fyi.facts)}${choices([["fyiOk","확인했어",fyi.id]])}`}
+  else if(replied){const c=replied.reply.choice;body=`<p class="say">${nm(o)}의 답이에요.\n${esc(replyLine(me,c,replied.reply.note,replied.kind))}</p>${choices(c==="hard"?[["align","같이 맞춰보기",replied.id],["ack","다음에 할게",replied.id]]:[["ack","알겠어",replied.id]])}`}
+  else if(cons){pose="sniff";body=`<p class="say">${cons.from===me?"":`${nm(o)}가 같이 맞춰보자고 했어요.\n`}둘 다 괜찮은 방법을 찾으려고 ${esc(elf().name)}가 각자에게 따로 물어봐요. ${nm(o)}는 내 답을 못 봐요.</p>${choices([["go","답하러 가기","thread|"+cons.id]])}`}
+  else if(aligning){const mine_=aligning.picks?.[me]?.v===aligning.version;pose="wobble";body=`<p class="say">${mine_?`나는 골랐어요. ${nm(o)}가 고르는 중이에요.`:`둘 다 괜찮을 방법이 ${(aligning.options||[]).length}개 나왔어요. 하나 골라요.`}</p>${choices([["go",mine_?"대안 다시 보기":"대안 보러 가기","thread|"+aligning.id]])}`}
   else if(expired){body=`<p class="say">"${esc(expired.text)}"\n1주 해봤어요. 어땠어요?</p>${choices([["agrKeep","좋아, 계속할래",expired.id],["agrChange","조금 바꾸고 싶어",expired.id],["agrEnd","그만할래",expired.id],["dismissAgr","나중에",expired.id]])}`}
-  else if(edit){body=`<p class="say">${nm(o)}가 카드를 고쳤어요.\n"${esc(edit.title)}"</p>${choices([["dismissEdit","알겠어",edit.id+"|"+edit.editedAt],["go","카드 보기","card|"+edit.id]])}`}
+  else if(edit){const now_=edit[o],mineSet=!!edit[me];body=`<p class="say">${nm(o)}가 카드를 고쳤어요.\n"${esc(edit.title)}"${now_&&mineSet?` → ${esc(pickTxt(now_))}`:""}</p>${choices([["dismissEdit","알겠어",edit.id+"|"+edit.editedAt],["go","카드 보기","card|"+edit.id]])}`}
   else{const late=waiting&&Date.now()-(waiting.deliveredAt||waiting.ts)>WAIT_MS;
-    const hold=queued?[`${nm(o)}가 자는 중이라 편지를 들고 기다리는 중이에요. 일어나면 전할게요.`,queued.id]:consWait?[`${nm(o)}가 조건에 답하는 중이에요. 답이 오면 대안을 만들게요.`,consWait.id]:late?[`${nm(o)}에게서 아직 답이 없어요. 답이 없는 건 괜찮다는 뜻으로 보지 않을게요.`,waiting.id]:waiting?[`${nm(o)}의 답을 기다리는 중이에요.`,waiting.id]:null;
+    const hold=queued?[joined(o)?`${nm(o)}가 자는 중이라 편지를 들고 기다리는 중이에요. 일어나면 전할게요.`:`룸메가 들어오면 전할 편지를 들고 있어요.`,queued.id]:consWait?[`${nm(o)}가 조건에 답하는 중이에요. 답이 오면 대안을 만들게요.`,consWait.id]:late?[`${nm(o)}에게서 아직 답이 없어요. 답이 없는 건 괜찮다는 뜻으로 보지 않을게요.`,waiting.id]:waiting?[`${nm(o)}의 답을 기다리는 중이에요.`,waiting.id]:null;
     if(queued||waiting){pose="letter"}
-    body=`${hold?`<div class="why" style="margin:0 0 10px">${esc(hold[0])} <button class="lnk" data-act="go" data-arg="thread|${hold[1]}">편지 보기</button></div>`:""}<label class="say" for="sayT">${hold?"다른 할 말이 있어요?":"무슨 일이에요?"}</label><div class="row" style="margin-top:0"><input id="sayT" class="input" maxlength="120" placeholder="예: 지금 방에서 통화해도 돼?" style="flex:3"><button class="btn main px4" data-act="say">말하기</button></div>${unsorted?`<button class="lnk" data-act="toCards">카드 먼저 정하기</button>`:""}`}
-  if(pose==="stand"&&!f&&st[o]==="sleep"){pose="sleep";mx=o==="A"?74:320;my=318}
-  const bang=unsorted&&!f?`<button class="bang" data-act="toCards" aria-label="안 정한 카드 ${unsorted}장" style="left:${mx+22}px;top:${my-92}px">!</button>`:"";
+    const invite=!joined(o)?`<div class="why" style="margin:0 0 10px">룸메가 아직 방에 안 들어왔어요. 초대 링크나 코드 <b class="dh" style="letter-spacing:.08em;color:var(--ink)">${esc(S.code)}</b>를 보내주세요. <button class="lnk" data-act="${S.online?"copyLink":"copyCode"}">${S.online?"초대 링크 복사":"코드 복사"}</button></div>`:"";
+    const asleep=st[me]==="sleep"?`<div class="why" style="margin:0 0 10px">나는 자는 중이에요. 그동안 오는 편지는 ${esc(elf().name)}가 들고 있다가 깨면 전해줘요. <button class="lnk" data-act="setSt" data-arg="in">깨어 있음으로 바꾸기</button></div>`:"";
+    body=`${invite}${asleep}${hold?`<div class="why" style="margin:0 0 10px">${esc(hold[0])} <button class="lnk" data-act="go" data-arg="thread|${hold[1]}">편지 보기</button></div>`:""}<label class="say" for="sayT">${hold?"다른 할 말이 있어요?":"무슨 일이에요?"}</label><div class="row" style="margin-top:0"><input id="sayT" class="input" maxlength="120" placeholder="예: 지금 방에서 통화해도 돼?" style="flex:3"><button class="btn main px4" data-act="say">말하기</button></div>${unsorted?`<button class="lnk" data-act="toCards">카드 먼저 정하기</button>`:""}`}
+  const zMe=st[me]==="sleep",zO=joined(o)&&st[o]==="sleep";
+  if(pose==="stand"&&!f&&(zMe||zO)){pose="sleep";if(zMe&&zO){mx=196;my=360}else{const who=zMe?me:o;mx=who==="A"?74:320;my=318}}
+  const bang=unsorted&&!f&&pose!=="sleep"?`<button class="bang" data-act="toCards" aria-label="안 정한 카드 ${unsorted}장" style="left:${mx+22}px;top:${my-92}px">!</button>`:"";
   const eh=pose==="sleep"?52:80;
-  return `<div class="scene"><div class="stage"><div class="world" data-focus="${my}"><div class="room t-${dayPart()}" role="img" aria-label="저녁의 우리 방. 왼쪽 남색 침대는 ${nm("A")}, 오른쪽 초록 침대는 ${nm("B")}. ${st[o]==="sleep"?"요정이 "+nm(o)+" 침대 옆에서 자고 있어요.":""}" style="width:392px;height:588px"></div>${elfSVG(elfKey(),pose,`요정 ${elf().name}`,4,`left:${mx}px;top:${my}px;transform:translate(-50%,-100%)`)}${bang}</div>
-<div class="hud"><span class="chip px4">${nm(o)} ${ST[st[o]]||""}</span><span style="display:flex;gap:6px"><button class="chip light px4" data-act="cycle" aria-label="내 상태 바꾸기, 지금 ${ST[st[me]]||""}">나 ${ST[st[me]]||""}</button><button class="chip light px4" data-act="go" data-arg="me" aria-label="설정">⚙</button></span></div></div>${dialog(body)}</div>`;
+  return `<div class="scene"><div class="stage"><div class="world" data-focus="${my}"><div class="room t-${zMe?"night":dayPart()}" role="img" aria-label="${zMe?"불을 끈 ":""}우리 방. 왼쪽 남색 침대는 ${nm("A")}, 오른쪽 초록 침대는 ${nm("B")}. ${pose==="sleep"?"요정이 "+(zMe&&zO?"방 가운데서":(zMe?"내":nm(o))+" 침대 옆에서")+" 같이 자고 있어요.":""}" style="width:392px;height:588px"></div>${elfSVG(elfKey(),pose,`요정 ${elf().name}`,4,`left:${mx}px;top:${my}px;transform:translate(-50%,-100%)`)}${bang}</div>
+<div class="hud"><span class="chip px4">${joined(o)?`${nm(o)} ${ST[st[o]]||""}`:"룸메 아직 안 들어옴"}</span><span style="display:flex;gap:6px"><button class="chip light px4" data-act="setSt" data-arg="${st[me]==="sleep"?"in":"sleep"}" aria-label="내 상태 바꾸기, 지금 ${ST[st[me]]||""}">나 ${ST[st[me]]||""}</button><button class="chip light px4" data-act="go" data-arg="me" aria-label="설정">⚙</button></span></div></div>${dialog(body)}</div>`;
 }
 
 /* ---------- 화면: 편지 ---------- */
 function lettersView(){
   const me=S.seat,all=S.reqs.filter(r=>(r.from===me||r.to===me)&&!(r.to===me&&["direct","rule","queued"].includes(r.stage))).sort((a,b)=>b.ts-a.ts);
   const todo=all.filter(todoFor),rest=all.filter(r=>!todoFor(r));
-  const row=r=>{const t=todoFor(r);return `<button class="lt" data-act="go" data-arg="thread|${r.id}"><span class="lt-main"><span class="lt-who"><i style="background:var(--${r.from==="A"?"a":"b"})"></i>${nm(r.from)} → ${nm(r.to)} · ${when(r.ts)}</span><span class="lt-txt">${esc(r.draft||r.text)}</span></span><span class="lt-st ${t?"lt-todo":""}">${t?"내 차례":STAGE[r.stage]||r.stage}</span></button>`};
+  const who=r=>r.stage==="direct"?`${nm(r.from)} · ${esc(elf().name)}가 바로 답함`:r.stage==="rule"?`${nm(r.from)} · 전하지 않음`:`${nm(r.from)} → ${nm(r.to)}`;
+  const row=r=>{const t=todoFor(r);return `<button class="lt" data-act="go" data-arg="thread|${r.id}"><span class="lt-main"><span class="lt-who"><i style="background:var(--${r.from==="A"?"a":"b"})"></i>${who(r)} · ${when(r.ts)}</span><span class="lt-txt">${esc(r.draft||r.text)}</span></span><span class="lt-st ${t?"lt-todo":""}">${t?"내 차례":STAGE[r.stage]||r.stage}</span></button>`};
   return `<div class="page">${header("편지")}
 ${todo.length?`<h2 class="sec">내 차례 ${todo.length}</h2><div class="ltbox">${todo.map(row).join("")}</div>`:""}
 ${rest.length?`<h2 class="sec">${todo.length?"지난 편지":"오간 편지"}</h2><div class="ltbox">${rest.map(row).join("")}</div>`:""}
 ${all.length?"":`<p class="sub" style="margin-top:30px;text-align:center">아직 오간 편지가 없어요.<br>우리 방에서 ${esc(elf().name)}에게 말해보세요.</p>`}</div>`;
 }
+// 편지 위에 붙는 지금 단계 한 줄
+function stageLine(r){const me=S.seat,N=nm;
+  switch(r.stage){
+    case "direct":return `${esc(elf().name)}가 카드를 보고 바로 답했어요. ${N(r.to)}에게는 안 갔어요.`;
+    case "rule":return `기숙사 규칙이라 ${N(r.to)}에게 전하지 않았어요.`;
+    case "fyi":return r.to===me?"알림이에요. 답은 안 해도 돼요.":`${N(r.to)}에게 알림만 남겼어요.`;
+    case "queued":return joined(r.to)?`${N(r.to)} 자는 중. 일어나면 전해져요.`:"룸메가 방에 들어오면 전해져요.";
+    case "delivered":return r.to===me?"내 답을 기다리고 있어요.":`${N(r.to)}의 답을 기다리는 중이에요.`;
+    case "replied":return r.from===me?`${N(r.to)}가 답했어요.`:"답을 보냈어요.";
+    case "done":return "끝난 편지예요.";
+    case "constraints":return `각자 조건 듣는 중 · ${["A","B"].map(x=>`${N(x)} ${r.consDone?.[x]?"답함":"아직"}`).join(" · ")}`;
+    case "aligning":return `대안 고르는 중 · ${["A","B"].map(x=>`${N(x)} ${r.picks?.[x]?.v===r.version?"골랐음":"아직"}`).join(" · ")}`;
+    case "agreed":return "둘 다 같은 안을 골라서 카드가 됐어요.";
+    case "blocked":return "여기서 멈췄어요.";
+    case "cancelled":return "보낸 사람이 취소했어요.";
+  }return ""}
+const routeTxt=(route,to)=>({covered_by_agreement:"카드 범위 안이라 바로 답",clarification_needed:"정보가 더 필요함",coordination_needed:`${nm(to)}에게 물어봐야 함`,rule:"기숙사 규칙에 걸림"})[route]||"-";
+const stripWho=t=>String(t||"").replace(/^[AB]\s*[:가이는은]?\s+/,"");
 function threadView(id){
   const r=findReq(id);if(!r)return `<div class="page">${header("편지",1)}<p class="sub">이 편지를 찾을 수 없어요.</p></div>`;
-  const me=S.seat,o=other(),t=r.translations?.[r.to];
-  const body=(r.to===me&&t)?t:(r.draft||r.text);
+  const me=S.seat,o=other(),t=r.translations?.[r.to],part=r.from===me||r.to===me;
+  const body=(r.to===me&&t)?nameT(t):(r.draft||r.text);
   const paper=(to,from,txt,extra,at)=>`<div class="letter"><p class="l-to">${nm(to)}에게</p><p class="l-body">${esc(txt)}</p>${extra||""}<p class="l-from">${at?when(at)+" · ":""}${nm(from)}</p></div>`;
-  let h=paper(r.to,r.from,body,factChips(r.facts)+(r.to===me&&t?`<details class="l-more"><summary>보낸 그대로 보기</summary><p>${esc(r.draft)}</p></details>`:""),r.ts);
-  if(r.c1&&r.from===me)h+=`<details class="l-more out"><summary>${esc(elf().name)}가 이렇게 읽었어요: ${ROUTE[r.c1.route]||"-"}</summary><p>${esc(r.c1.reason||"")}${(r.c1.evidence_ids||[]).length?`<br>본 카드: ${r.c1.evidence_ids.map(cid=>`<button class="lnk" data-act="go" data-arg="${evGo(cid)}">${esc(evTitle(cid))}</button>`).join(", ")}`:""}</p></details>`;
-  if(r.stage==="queued")h+=`<p class="l-note">${nm(r.to)} 자는 중. 일어나면 전해져요.</p>`;
-  if(r.reply)h+=paper(r.from,r.to,replyLine(r.from,r.reply.choice,r.reply.note),"",r.reply.at);
-  if(["constraints","aligning","agreed","blocked"].includes(r.stage)&&r.consDone)h+=`<p class="l-note">각자 조건 듣는 중 · ${["A","B"].map(x=>`${nm(x)} ${r.consDone?.[x]?"답함":"아직"}`).join(" · ")}</p>`;
-  if(r.options&&r.stage!=="agreed")h+=`<h2 class="sec">대안 ${r.round>1?`(${r.round}번째)`:""}</h2><div class="list">${r.options.map((op,i)=>`<div class="mini" style="flex-direction:column;align-items:stretch;gap:4px"><span>${i+1}. ${esc(op.action)}</span><span style="font-size:14px;color:var(--muted)">${esc(op.time_place||"")}${["A","B"].filter(x=>op.adjustments_by_person?.[x]).map(x=>` · ${nm(x)}: ${esc(op.adjustments_by_person[x])}`).join("")}</span>${["A","B"].filter(x=>r.picks?.[x]?.i===i&&r.picks[x].v===r.version).map(x=>`<span style="font-size:14px;color:var(--${x==="A"?"a":"b"})">${nm(x)} 고름</span>`).join("")}</div>`).join("")}</div>`;
+  let h=`<p class="stline">${stageLine(r)}</p>`;
+  h+=paper(r.to,r.from,body,factChips(r.facts)+(r.to===me&&t?`<details class="l-more"><summary>보낸 그대로 보기</summary><p>${esc(r.draft)}</p></details>`:""),r.ts);
+  if(r.c1&&r.from===me)h+=`<details class="l-more out"><summary>${esc(elf().name)}가 이렇게 읽었어요: ${routeTxt(r.c1.route,r.to)}</summary><p>${esc(nameT(r.c1.reason||""))}${(r.c1.evidence_ids||[]).length?`<br>본 카드: ${r.c1.evidence_ids.map(cid=>`<button class="lnk" data-act="go" data-arg="${evGo(cid)}">${esc(nameT(evTitle(cid)))}</button>`).join(", ")}`:""}</p></details>`;
+  // 답장은 답한 사람 본인의 말로 (전해 들은 말투 "어렵대요"는 우리 방 대화창에서만)
+  if(r.reply)h+=paper(r.from,r.to,replySelf(r.kind,r.reply.choice,r.reply.note),"",r.reply.at);
+  // 대안: 고르는 중이면 카드 자체가 고르는 버튼. 상대가 뭘 골랐는지는 내가 고르기 전엔 안 보인다
+  if(r.options&&["aligning","agreed","blocked"].includes(r.stage)){
+    const myPick=r.picks?.[me]?.v===r.version?r.picks[me].i:-1,theirPick=r.picks?.[o]?.v===r.version?r.picks[o].i:-1;
+    const canPick=r.stage==="aligning"&&part,agreedI=r.stage==="agreed"?r.picks?.A?.i:-1;
+    const opt=(op,i)=>{const on=r.stage==="agreed"?i===agreedI:myPick===i;
+      const tags=r.stage==="agreed"?(i===agreedI?[`<span class="opt-tag">둘 다 고름</span>`]:[]):[myPick===i?`<span class="opt-tag me">내가 고름</span>`:"",myPick>=0&&theirPick===i?`<span class="opt-tag">${nm(o)} 고름</span>`:""];
+      const lines=["A","B"].filter(x=>op.adjustments_by_person?.[x]).map(x=>`<span class="opt-s">${nm(x)} 맞춤 · ${esc(nameT(stripWho(op.adjustments_by_person[x])))}</span>`).concat(["A","B"].filter(x=>op.gains_by_person?.[x]).map(x=>`<span class="opt-s">${nm(x)} 얻음 · ${esc(nameT(stripWho(op.gains_by_person[x])))}</span>`));
+      const inner=`<span class="opt-t">${i+1}. ${esc(nameT(op.action))}</span>${op.time_place?`<span class="opt-s">${esc(nameT(op.time_place))}</span>`:""}${lines.join("")}${tags.join("")}`;
+      return canPick?`<button class="opt ${on?"on":""}" data-act="pick" data-arg="${r.id}|${i}" aria-pressed="${on}">${inner}</button>`:`<div class="opt ${on?"on":""}">${inner}</div>`};
+    h+=`<h2 class="sec">${r.stage==="agreed"?"고른 안":"둘 다 괜찮을 방법"}${r.round>1?` (${r.round}번째)`:""}</h2><div class="opts">${r.options.map(opt).join("")}</div>`;
+    if(canPick)h+=`<p class="sub" style="margin:8px 2px 0">${myPick<0?`하나 골라요. 둘 다 같은 안을 고르면 카드가 돼요. ${theirPick>=0?`${nm(o)}는 골랐어요 (내가 고르면 보여요).`:`${nm(o)}도 고르는 중이에요.`}`:theirPick<0?`${nm(o)}가 고르면 알려줄게요. 다른 안으로 바꿔도 돼요.`:`서로 다른 안을 골랐어요. 하나로 맞추거나 "다 어려워요"로 다른 방법을 찾아봐요.`}</p><div class="col"><button class="btn px4" data-act="noneFit" data-arg="${r.id}">다 어려워요, 다른 방법 찾기</button></div>`;
+  }
   if(r.stage==="blocked")h+=`<p class="l-note">${esc(r.blockReason||"")} 이건 직접 얘기해보는 게 좋겠어요.</p>`;
   if(r.stage==="agreed"){const ag=S.agrs.find(a=>a.from===r.id);if(ag)h+=`<button class="banner px4" data-act="go" data-arg="agr|${ag.id}" style="margin-top:14px"><span>카드가 됐어요</span><b>보기 ▶</b></button>`}
   let act="";
-  if(r.to===me&&r.stage==="delivered")act=`<label class="vh" for="noteT">조건이나 한마디</label><input id="noteT" class="input" maxlength="60" placeholder="조건이나 한마디 (선택)"><div class="col"><button class="btn main px4" data-act="rOk" data-arg="${r.id}">응, 괜찮아</button><button class="btn px4" data-act="rCond" data-arg="${r.id}">조건 있으면 괜찮아</button><button class="btn px4" data-act="rHard" data-arg="${r.id}">이번엔 어려워요</button></div>`;
+  if(r.to===me&&r.stage==="delivered")act=`<label class="vh" for="noteT">조건이나 한마디</label><input id="noteT" class="input" maxlength="60" placeholder="조건이나 한마디 (선택)"><div class="col">${replyBtns(r,true).join("")}</div>`;
   else if(r.from===me&&r.stage==="replied")act=`<div class="col">${r.reply.choice==="hard"?`<button class="btn main px4" data-act="align" data-arg="${r.id}">같이 맞춰보기</button>`:""}<button class="btn px4" data-act="ack" data-arg="${r.id}">${r.reply.choice==="hard"?"다음에 할게":"알겠어"}</button></div>`;
-  else if(r.stage==="constraints"&&(r.from===me||r.to===me)&&!r.consDone?.[me]){
+  else if(r.stage==="constraints"&&part&&!r.consDone?.[me]){
     const c2=S.c2[r.id];if(!c2)setTimeout(()=>loadC2(r),0);
-    act=c2?.questions?`<p class="sub" style="margin-top:14px">${nm(o)}는 내 답을 못 봐요. 알려도 되는 답에만 체크해요.</p>${c2.questions.map((q,i)=>`<div class="mini" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:8px"><label for="ca${i}" style="font-weight:700">${esc(q)}</label><textarea id="ca${i}" class="input" rows="2" placeholder="답하지 않아도 돼요"></textarea><label style="display:flex;gap:8px;align-items:center;font-size:14px;font-family:var(--fs)"><input type="checkbox" id="cs${i}"> ${nm(o)}와 대안 만들 때 써도 돼요</label></div>`).join("")}<div class="col"><button class="btn main px4" data-act="consSubmit" data-arg="${r.id}">답 보내기</button></div>`:`<p class="sub" style="margin-top:14px">질문을 고르는 중이에요.</p>`;
+    act=c2?.questions?`<p class="sub" style="margin-top:14px">${esc(elf().name)}가 나한테만 묻는 질문이에요. ${nm(o)}는 내 답을 못 봐요. 대안을 만들 때 써도 되는 답에만 체크해요.</p>${c2.questions.map((q,i)=>`<div class="mini" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:8px"><label for="ca${i}">${esc(q)}</label><textarea id="ca${i}" class="input" rows="2" placeholder="답하지 않아도 돼요"></textarea><label class="chk"><input type="checkbox" id="cs${i}"> 대안 만들 때 써도 돼요</label></div>`).join("")}<div class="col"><button class="btn main px4" data-act="consSubmit" data-arg="${r.id}">답 보내기</button></div>`:`<p class="sub" style="margin-top:14px">질문을 고르는 중이에요.</p>`;
   }
-  else if(r.stage==="aligning"&&r.options&&(r.from===me||r.to===me))act=`<div class="col">${r.options.map((op,i)=>`<button class="btn ${r.picks?.[me]?.i===i&&r.picks[me].v===r.version?"main":""} px4" data-act="pick" data-arg="${r.id}|${i}" aria-pressed="${r.picks?.[me]?.i===i}">${esc(op.action)}</button>`).join("")}<button class="btn px4" data-act="noneFit" data-arg="${r.id}">다 어려워요</button></div><p class="sub" style="margin-top:8px">같은 버전의 같은 안을 둘 다 골라야 합의돼요. 고르지 않은 건 합의가 아니에요.</p>`;
+  else if(r.stage==="constraints"&&part)act=`<p class="l-note">내 답을 보냈어요. ${nm(o)}도 답하면 ${esc(elf().name)}가 둘 다 괜찮을 방법을 찾아요.</p>`;
   else if(r.from===me&&(r.stage==="delivered"||r.stage==="queued"))act=`<div class="col"><button class="btn px4" data-act="cancelReq" data-arg="${r.id}">보낸 것 취소하기</button></div>`;
   else if(r.to===me&&r.stage==="fyi")act=`<div class="col"><button class="btn main px4" data-act="fyiOk" data-arg="${r.id}">확인했어</button></div>`;
   return `<div class="page">${header("편지",1)}${h}${act}</div>`;
@@ -582,11 +656,12 @@ function agrRow(a){
 }
 function agrDetail(id){
   const a=S.agrs.find(x=>x.id===id);if(!a||a.state==="off")return `<div class="page">${header("카드",1)}<p class="sub">이 카드는 이제 없어요.</p></div>`;
-  const left=agrLeft(a),op=a.option||{},adj=["A","B"].filter(x=>op.adjustments_by_person?.[x]);
-  return `<div class="page">${header("카드",1)}<div style="max-width:280px;margin:4px auto 16px"><div class="bigcard px6"><div style="background:#FFF1B8"><div class="ttag" style="background:var(--postit);display:flex;justify-content:space-between"><span>같이 만든 카드</span><span>${left>0?"1주 체험 중":"1주 지남"}</span></div><div style="padding:22px 20px 20px"><p style="margin:0;font-size:16px;line-height:1.4;text-align:center">${esc(a.text)}</p></div></div></div></div>
-<div class="list">${adj.map(x=>`<div class="mini"><span><b style="color:var(--${x==="A"?"a":"b"});font-weight:400">${nm(x)}</b> ${esc(String(op.adjustments_by_person[x]).replace(/^[AB]\s*[:가이는은]?\s+/,""))}</span></div>`).join("")}<div class="mini"><span>상태</span><span class="dh" style="color:#8A6A00">${left>0?`1주 체험 중, ${left}일 남음`:"1주가 지났어요"}</span></div></div>
-
-<div class="col"><button class="btn main px4" data-act="agrKeep" data-arg="${a.id}">${left>0?"잘 맞아, 1주 더":"좋아, 계속할래"}</button><button class="btn px4" data-act="agrChange" data-arg="${a.id}">조금 바꾸고 싶어</button><button class="btn px4" data-act="agrEnd" data-arg="${a.id}">그만할래</button><button class="lnk" data-act="go" data-arg="thread|${a.from}">어떻게 정했는지 보기</button></div></div>`;
+  const left=agrLeft(a),op=a.option||{},rows=["A","B"].filter(x=>op.adjustments_by_person?.[x]).map(x=>[x,"맞춤",op.adjustments_by_person[x]]).concat(["A","B"].filter(x=>op.gains_by_person?.[x]).map(x=>[x,"얻음",op.gains_by_person[x]]));
+  const end=new Date(a.until),endTxt=`${end.getMonth()+1}월 ${end.getDate()}일`,late=left<=2;
+  return `<div class="page">${header("카드",1)}<div style="max-width:280px;margin:4px auto 16px"><div class="bigcard px6"><div style="background:#FFF1B8"><div class="ttag" style="background:var(--postit);display:flex;justify-content:space-between"><span>같이 만든 카드</span><span>${left>0?"1주 체험 중":"1주 지남"}</span></div><div style="padding:22px 20px 20px"><p style="margin:0;font-size:18px;line-height:1.45;text-align:center">${esc(nameT(a.text))}</p></div></div></div></div>
+<div class="list">${rows.map(([x,k,v])=>`<div class="mini"><span><b style="color:var(--${x==="A"?"a":"b"});font-weight:400">${nm(x)} ${k}</b> · ${esc(nameT(stripWho(v)))}</span></div>`).join("")}<div class="mini"><span>상태</span><span class="dh" style="color:#8A6A00">${left>0?`1주 체험 중, ${left}일 남음`:"1주가 지났어요"}</span></div></div>
+<p class="why" style="margin-top:12px">${left>0?`${endTxt}에 ${esc(elf().name)}가 둘에게 어땠는지 물어볼게요. 그동안 이 카드에 맞는 일은 바로 답하고 룸메에게 알림만 남겨요.`:"1주 해봤어요. 계속할지, 바꿀지, 그만할지 골라요."}</p>
+<div class="col">${late?`<button class="btn main px4" data-act="agrKeep" data-arg="${a.id}">${left>0?"잘 맞아, 1주 더":"좋아, 계속할래"}</button>`:""}<button class="btn px4" data-act="agrChange" data-arg="${a.id}">조금 바꾸고 싶어</button><button class="btn px4" data-act="agrEnd" data-arg="${a.id}">그만할래</button><button class="lnk" data-act="go" data-arg="thread|${a.from}">어떻게 정했는지 보기</button></div></div>`;
 }
 /* 카드 그림: 지피티로 뽑은 9칸 시트를 잘라 앱 안에 넣은 것 (src/img/card1-9.webp) */
 const ART_N={phone:1,dryer:2,lamp:3,laptop:4,friends:5,fridge:6};
@@ -606,7 +681,7 @@ function tile(c){
 }
 function agrTile(a){
   const left=agrLeft(a);
-  return `<button class="tile" data-act="go" data-arg="agr|${a.id}"><span class="tile-in" style="background:#FFF1B8"><span class="ttag" style="background:var(--postit)">같이 만든 카드</span><span class="tname big">${esc(a.text)}</span><span class="tstate" style="background:${left>0?"var(--postit)":"#F5B8A8"}">${left>0?`1주 체험 중 · ${left}일`:"1주 지남"}</span></span></button>`;
+  return `<button class="tile" data-act="go" data-arg="agr|${a.id}"><span class="tile-in" style="background:#FFF1B8"><span class="ttag" style="background:var(--postit)">같이 만든 카드</span><span class="tname big">${esc(nameT(a.text))}</span><span class="tstate" style="background:${left>0?"var(--postit)":"#F5B8A8"}">${left>0?`1주 체험 중 · ${left}일`:"1주 지남"}</span></span></button>`;
 }
 function cardsView(){
   const me=S.seat,un=S.cards.filter(c=>!c[me]&&!c.locked),done=S.cards.filter(c=>c[me]&&!c.locked),rules=S.cards.filter(c=>c.locked),on=S.agrs.filter(a=>a.state!=="off");
@@ -645,7 +720,7 @@ function meView(){
 <div class="list">${["soft","direct"].map(k=>`<button class="mini item ${tk===k?"sel":""}" data-act="setTone" data-arg="${k}" aria-pressed="${tk===k}"><span style="text-align:left"><b class="dh" style="font-size:16px;font-weight:400">${TONES[k].label}</b><br><span style="font-size:14px;font-family:var(--fs)">"${esc(PREVIEW[k])}"</span></span>${tk===k?`<span class="dh state" style="color:var(--elf)">지금</span>`:""}</button>`).join("")}</div>
 <h2 class="dh">내 상태</h2><div class="seg">${[["in","깨어 있음"],["sleep","자는 중"]].map(([k,v])=>`<button class="segb ${st===k?"on":""}" data-act="setSt" data-arg="${k}" aria-pressed="${st===k}">${v}</button>`).join("")}</div>
 <h2 class="dh">내 이름</h2><div class="row" style="margin-top:0"><input id="nameS" class="input" maxlength="8" style="flex:2" value="${esc(S.room?.names?.[S.seat]||"")}" placeholder="예: 현지"><button class="btn px4" data-act="saveName">저장</button></div><h2 class="dh">방</h2><div class="list"><div class="mini"><span>방 코드 </span><b class="dh" style="font-size:16px;font-weight:400;letter-spacing:.08em">${esc(S.code)}</b></div></div>
-<div class="col">${S.room?.demo?`<button class="btn px4" data-act="switchSeat">${nm(other())} 화면으로 보기</button>`:""}<button class="btn px4" data-act="export">기록 내보내기</button><button class="btn px4" data-act="leave">방 나가기</button></div>
+<div class="col">${S.room?.demo?`<button class="btn px4" data-act="switchSeat">${nm(other())} 화면으로 보기</button>`:""}<button class="btn px4" data-act="export">기록 내보내기</button>${S.confirmLeave?`<div class="why" style="margin:0" role="alert">방을 나가도 방과 편지는 그대로 있어요. 다시 들어오려면 방 코드 <b class="dh" style="color:var(--ink);letter-spacing:.08em">${esc(S.code)}</b>가 필요해요. 이 기기에서는 첫 화면에 남겨둘게요.<div class="row"><button class="btn px4" data-act="leaveNo">취소</button><button class="btn main px4" data-act="leave">나가기</button></div></div>`:`<button class="btn px4" data-act="leaveAsk">방 나가기</button>`}</div>
 </div>`;
 }
 function onboardView(){
@@ -661,7 +736,8 @@ ${S.local?`<p class="why" style="margin:0">로컬 모드예요. ${S.localAI?"AI�
 ${S.online&&S.noAI?`<p class="why" style="margin:0">AI가 아직 연결 전이에요. 지금은 ${esc("보라")}가 직접 판단하지 않고 전부 룸메에게 물어봐요.</p>`:""}
 ${S.pickSeat?`<p class="why" style="margin:0">이 방에는 이미 두 사람이 있어요. 다른 기기에서 쓰던 방이면 누구인지 골라주세요.</p><input id="codeT" type="hidden" value="${esc(S.pickSeat.code)}">${["A","B"].map(x=>`<button class="btn px4" data-act="join" data-arg="${x}">${S.pickSeat.names[x]?"나는 "+esc(S.pickSeat.names[x]):(x==="A"?"내가 방을 만들었어":"나는 초대받았어")}</button>`).join("")}<button class="lnk" data-act="noInvite" style="align-self:center">처음으로</button>`:!db||S.busy0?`<p class="say" style="text-align:center;margin-top:20px">${S.busy0?"방을 준비하는 중이에요...":"불러오는 중이에요"}</p>`:S.invite?`<p class="sub" style="margin:0;text-align:center">룸메가 보낸 방 <b class="dh" style="letter-spacing:.1em">${esc(S.invite)}</b></p><input id="codeT" type="hidden" value="${esc(S.invite)}"><button class="btn main px4" data-act="join" data-arg="auto">룸메 방에 들어가기</button><button class="lnk" data-act="noInvite" style="align-self:center">다른 방을 만들거나 들어갈래</button>`:`<button class="btn main px4" data-act="create" data-arg="A">새 방 만들기</button>
 <label class="dh" for="codeT" style="font-size:16px;margin-top:14px">코드로 들어가기</label><div class="row" style="margin-top:0"><input id="codeT" class="input" placeholder="6자리 코드" maxlength="6" autocapitalize="characters" autocomplete="off" style="flex:2"><button class="btn px4" data-act="join" data-arg="auto">들어가기</button></div>
-<div style="border-top:2px dotted var(--elf-l);margin-top:12px;padding-top:12px"><button class="btn px4" data-act="demo" style="width:100%">혼자 둘러보기</button></div>`}</div>`;
+${ls("lastRoom")?`<button class="btn px4" data-act="rejoin" data-arg="${esc(ls("lastRoom"))}">최근 방 ${esc(ls("lastRoom"))}로 돌아가기</button>`:""}
+<div style="border-top:2px dotted var(--elf-l);margin-top:12px;padding-top:12px"><button class="btn px4" data-act="demo" style="width:100%">혼자 둘러보기</button><p class="sub" style="margin:6px 0 0;text-align:center">예시 편지가 들어 있는 방이에요. 설정에서 룸메 화면으로 바꿔 볼 수 있어요.</p></div>`}</div>`;
 }
 function shareView(){
   return `<div class="center"><p class="sub" style="margin:0">방이 생겼어요</p><h1 class="ttl">룸메에게 보내요</h1>
@@ -713,8 +789,8 @@ document.addEventListener("click",async e=>{
   else if(a==="unpick"){const p={...(S.room?.fairyPick||{})};delete p[S.seat];await roomRef().update({fairyPick:p})}
   else if(a==="refairy"){await roomRef().update({elf:null,fairyPick:{},fairyMiss:0});go("home")}
   else if(a==="setTone"){await setTone(arg);for(const r of S.reqs)if(r.to===S.seat&&["delivered","fyi"].includes(r.stage)&&r.translations?.[S.seat])await reqRef(r.id).update({translations:{...r.translations,[S.seat]:null}})}
-  else if(a==="obDone"){const v=($("#nameT")?.value||"").trim().slice(0,8);if(v)await roomRef().update({names:{...(S.room?.names||{}),[S.seat]:v}});go(arg==="cards"?"sort":arg)}
-  else if(a==="saveName"){const v=($("#nameS")?.value||"").trim().slice(0,8);if(v){const snap=await roomRef().get();await roomRef().update({names:{...((snap.data()||{}).names||{}),[S.seat]:v}});announce("이름을 바꿨어요")}}
+  else if(a==="obDone"){const v=($("#nameT")?.value||"").trim().slice(0,8);if(v)await mergeIn(roomRef(),{names:{[S.seat]:v}});go(arg==="cards"?"sort":arg)}
+  else if(a==="saveName"){const v=($("#nameS")?.value||"").trim().slice(0,8);if(v){await mergeIn(roomRef(),{names:{[S.seat]:v}});announce("이름을 바꿨어요")}}
   else if(a==="switchSeat"){await enter(S.code,other())}
   else if(a==="fillSay"){const el=$("#sayT");if(el){el.value=arg;el.focus()}}
   else if(a==="say"){const t=($("#sayT")?.value||"").trim();if(!t){$("#sayT")?.focus();return}b.disabled=true;$("#sayT").value="";await submitSay(t)}
@@ -725,7 +801,9 @@ document.addEventListener("click",async e=>{
   else if(a==="confirmAsk"){const t=($("#askF")?.value||"").trim();if(!t)return;b.disabled=true;await sendAsk(t,S.flow?.facts||[])}
   else if(a==="why"){S.flow={...S.flow,showWhy:true};render()}
   else if(a==="wrong"){const r=findReq(arg);if(r)await reqRef(r.id).update({stage:deliverStage(),corrected:true,translations:{},c1:{...r.c1,route:"coordination_needed",checks:[...(r.c1?.checks||[]),"사용자가 '이건 물어봐줘'로 고침"]}});S.flow={k:"wrongDone"};render()}
-  else if(a==="rOk"||a==="rCond"||a==="rHard"){const r=findReq(arg);if(r){b.disabled=true;await reply(r,a==="rOk"?"ok":a==="rCond"?"cond":"hard",$("#noteT")?.value||"")}}
+  else if(a==="rOk"||a==="rCond"||a==="rHard"){const r=findReq(arg),note=($("#noteT")?.value||"").trim();
+    if(a==="rCond"&&!note){const el=$("#noteT");if(el){el.placeholder="어떤 조건인지 적어주세요 (예: 11시 전까지만)";el.classList.add("need");el.focus()}announce("어떤 조건인지 적어주세요");return}
+    if(r){b.disabled=true;await reply(r,a==="rOk"?"ok":a==="rCond"?"cond":"hard",note)}}
   else if(a==="fyiOk"){const r=findReq(arg);if(r)await reqRef(r.id).update({stage:"done"})}
   else if(a==="ack"){const r=findReq(arg);if(r){b.disabled=true;await ackReply(r)}}
   else if(a==="align"){const r=findReq(arg);if(r){b.disabled=true;await startAlign(r)}}
@@ -734,14 +812,17 @@ document.addEventListener("click",async e=>{
   else if(a==="noneFit"){const r=findReq(arg);if(r){b.disabled=true;await noneFit(r)}}
   else if(a==="cancelReq"){const r=findReq(arg);if(r)await reqRef(r.id).update({stage:"cancelled"})}
   else if(a==="agrKeep"||a==="agrEnd"||a==="agrChange"){const ag=S.agrs.find(x=>x.id===arg);if(ag){await reviewAgr(ag,a==="agrKeep"?"keep":a==="agrEnd"?"end":"change");if(a!=="agrChange"){if(S.route.name==="agr")go("cards");else{S.flow=null;render()}}}}
-  else if(a==="seenAgr"){S.dismissed["na"+arg]=1;const g=S.agrs.find(x=>x.id===arg);try{await db.doc(`rooms/${S.code}/agreements/${arg}`).update({seen:{...(g?.seen||{}),[S.seat]:true}})}catch(e){}render()}
+  else if(a==="seenAgr"){S.dismissed["na"+arg]=1;const g=S.agrs.find(x=>x.id===arg);try{await mergeIn(db.doc(`rooms/${S.code}/agreements/${arg}`),{seen:{[S.seat]:true}})}catch(e){}render()}
   else if(a==="dismissAgr"){S.dismissed["agr"+arg]=1;render()}
   else if(a==="dismissEdit"){const [id,at]=arg.split("|");S.dismissed["edit"+id+at]=1;render()}
   else if(a==="cond"){const [id,t]=arg.split("|");condSel[id]=condSel[id]===t?"":t;render()}
   else if(a==="sort"){const [id,v]=arg.split("|");const c=S.cards.find(x=>x.id===id);if(c){b.disabled=true;await sortCard(c[S.seat]?{...c,redo:S.seat}:c,v,v==="O"?(condSel[id]||c[S.seat]?.cond||""):"");delete condSel[id];announce(v==="O"?"저장했어요: 그냥 해도 돼":"저장했어요: 먼저 물어봐줘")}}
   else if(a==="resetCard"){const c=S.cards.find(x=>x.id===arg);if(c){await resetCard(c);go("sort")}}
   else if(a==="export"){await exportLog()}
+  else if(a==="leaveAsk"){S.confirmLeave=true;render()}
+  else if(a==="leaveNo"){S.confirmLeave=false;render()}
   else if(a==="leave"){leave()}
+  else if(a==="rejoin"){b.disabled=true;await enter(arg,"auto");if(S.code&&S.cards.every(x=>x.locked||!x[S.seat])){S.route={name:"ob"};render()}}
   }catch(err){S.flow=null;render();announce("저장하지 못했어요.");const box=$(".dialog-in")||$(".page");if(!box){S.busy0=false;S.err="안 됐어요. 잠시 뒤 다시 해주세요. ("+(err?.code||err?.message||"error")+")";render()}else box.insertAdjacentHTML("afterbegin",`<p class="err" role="alert">저장하지 못했어요. 잠시 뒤 다시 해주세요. (${esc(err?.code||err?.message||"error")})</p>`)}
 });
 document.addEventListener("keydown",e=>{

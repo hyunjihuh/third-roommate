@@ -16,10 +16,28 @@ async def main():
     for _ in range(6):
       await pg.click('[data-act="sort"][data-arg$="|O"]');await pg.wait_for_timeout(250)
     await pg.screenshot(path=OUT+'/be_03_cardsA.png')
+    # 룸메가 들어오기 전에 보낸 편지: 들고 있다가 룸메가 들어오면 전한다
+    fails=[]
+    def chk(label,ok):
+      print('  확인',label,'통과' if ok else '실패')
+      if not ok: fails.append(label)
+    await pg.click('[data-act="go"][data-arg="home"]')
+    chk('룸메 없을 때 상단 칩', '룸메 아직 안 들어옴' in await pg.inner_text('.hud'))
+    await pg.fill('#sayT','방에서 과외해도 돼?');await pg.click('[data-act="say"]');await pg.wait_for_timeout(400)
+    await pg.click('[data-act="kindDo"]');await pg.wait_for_timeout(600)
+    chk('보낸 뒤: 룸메가 들어오면 전할게요', '룸메가 방에 들어오면 전할게요' in await pg.inner_text('.dialog'))
+    await pg.click('[data-act="ok"]');await pg.wait_for_timeout(300)
+    chk('홈: 편지를 들고 있음', '룸메가 들어오면 전할 편지' in await pg.inner_text('.dialog'))
+    await pg.screenshot(path=OUT+'/be_03b_A_waiting.png')
     # 같은 가짜 서버를 보게 하려고 같은 페이지에서 B로 바꿔 본다 (초대 링크 화면 확인)
     await pg.evaluate("leave();window.__devA=localStorage.getItem('dev');localStorage.setItem('dev','devB')");await pg.evaluate(f"S.invite='{code}';render()");await pg.screenshot(path=OUT+'/be_04_invite.png')
     await pg.click('[data-act="join"]');await pg.wait_for_timeout(600);await pg.screenshot(path=OUT+'/be_05_B_onboard.png')
-    await pg.click('[data-act="obDone"][data-arg="cards"]');await pg.wait_for_timeout(300)
+    await pg.click('[data-act="obDone"][data-arg="home"]');await pg.wait_for_timeout(900)
+    d=await pg.inner_text('.dialog')
+    chk('B가 들어오자 기다리던 편지 도착', '물어봐요' in d and '과외' in d)
+    await pg.screenshot(path=OUT+'/be_05b_B_got_letter.png')
+    await pg.click('[data-act="rOk"]');await pg.wait_for_timeout(500)
+    await pg.click('.dialog [data-act="toCards"]');await pg.wait_for_timeout(300)
     for _ in range(3):
       await pg.click('[data-act="sort"][data-arg$="|X"]');await pg.wait_for_timeout(250)
     await pg.click('[data-act="go"][data-arg="home"]');await pg.fill('#sayT','지금 방에서 통화해도 돼?');await pg.click('[data-act="say"]');await pg.wait_for_timeout(500);await pg.screenshot(path=OUT+'/be_06_B_pickKind.png')
@@ -28,5 +46,7 @@ async def main():
     await pg.evaluate("leave();localStorage.setItem('dev',window.__devA)");await pg.fill('#codeT',code);await pg.click('[data-act="join"][data-arg="auto"]');print('seat after rejoin',await pg.evaluate("S.seat"));await pg.wait_for_timeout(900);await pg.screenshot(path=OUT+'/be_08_A_letter.png')
     print('A sees', await pg.inner_text('.dialog'))
     print('errors',errs)
+    print('확인 실패:',len(fails),fails)
+    if fails or errs: raise SystemExit(1)
     await b.close()
 asyncio.run(main())
