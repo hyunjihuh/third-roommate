@@ -186,3 +186,5 @@ div.opt.on{box-shadow:inset 0 0 0 2.5px var(--line)}
 .lookname{font-size:14px}.lookhow{font-size:11px;color:var(--muted);line-height:1.3;text-align:center;min-height:0}
 .prop{position:absolute;pointer-events:none}
 .prop.dim{filter:brightness(.7) saturate(.85)}
+.elf .acc,.lookimg .acc{position:absolute;inset:0;display:block}
+.elf{overflow:visible}

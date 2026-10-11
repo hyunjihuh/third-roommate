@@ -1,18 +1,16 @@
 const IMG=__IMG__;
 const dayPart=()=>{const h=now().getHours();return h>=6&&h<16?"morning":h>=16&&h<21?"evening":"night"};
 const ELF_R={stand:142/200,letter:132/200,sleep:190/130,wobble:160/200,sniff:173/200,bow:145/200};
-(()=>{const st=document.createElement("style");st.textContent=`.room{background:url(${IMG.room}) 0 0/100% 100% no-repeat}`+["morning","night"].filter(k=>IMG["room_"+k]).map(k=>`.room.t-${k}{background-image:url(${IMG["room_"+k]})}`).join("")+Object.keys(ELF_R).map(k=>`.elf-${k}{background:url(${IMG["elf_"+k]}) center/contain no-repeat}`).join("")+`.letter::after{background:url(${IMG.stamp}) center/contain no-repeat}`+[1,2,3,4,5].filter(n=>IMG["look"+n]).map(n=>`.elf-look${n}{background:url(${IMG["look"+n]}) center/contain no-repeat}`).join("")+["sleepA","sleepB","slipA","slipB"].filter(k=>IMG["prop_"+k]).map(k=>`.prop-${k}{background:url(${IMG["prop_"+k]}) center/contain no-repeat}`).join("")+Array.from({length:18},(_,i)=>i+1).filter(n=>IMG["card"+n]).map(n=>`.art-${n}{background:url(${IMG["card"+n]}) center/cover no-repeat}`).join("");document.head.appendChild(st)})();
+(()=>{const st=document.createElement("style");st.textContent=`.room{background:url(${IMG.room}) 0 0/100% 100% no-repeat}`+["morning","night"].filter(k=>IMG["room_"+k]).map(k=>`.room.t-${k}{background-image:url(${IMG["room_"+k]})}`).join("")+Object.keys(ELF_R).map(k=>`.elf-${k}{background:url(${IMG["elf_"+k]}) center/contain no-repeat}`).join("")+`.letter::after{background:url(${IMG.stamp}) center/contain no-repeat}`+[0,1,2,3].filter(n=>IMG["grow"+n]).map(n=>`.elf-grow${n}{background:url(${IMG["grow"+n]}) center/contain no-repeat}`).join("")+["star","scarf"].filter(k=>IMG["acc_"+k]).map(k=>`.acc-${k}{background:url(${IMG["acc_"+k]}) center/contain no-repeat}`).join("")+["sleepA","sleepB","slipA","slipB"].filter(k=>IMG["prop_"+k]).map(k=>`.prop-${k}{background:url(${IMG["prop_"+k]}) center/contain no-repeat}`).join("")+Array.from({length:18},(_,i)=>i+1).filter(n=>IMG["card"+n]).map(n=>`.art-${n}{background:url(${IMG["card"+n]}) center/cover no-repeat}`).join("");document.head.appendChild(st)})();
 const ICONS=__ICONS__;
 const ELF_MAPS=__MAPS__;
-// 보라 꾸미기. 방에 하나뿐인 보라라 둘이 같이 본다(room.look). 쓰면서 하나씩 열린다
-const LOOKS=[
-  {n:0,name:"기본",how:"처음부터",ok:()=>true},
-  {n:1,name:"잎 네 장",how:"편지 3통 주고받기",ok:()=>S.reqs.filter(r=>!["rule","cancelled"].includes(r.stage)).length>=3},
-  {n:2,name:"꽃봉오리",how:"같이 만든 카드 1장",ok:()=>S.agrs.length>=1},
-  {n:3,name:"꽃 핌",how:"같이 만든 카드 1주 해보고 계속하기",ok:()=>S.agrs.some(a=>a.reviewedAt)},
-  {n:4,name:"별 핀",how:"내 카드 6장 다 정하기",ok:()=>S.cards.filter(c=>!c.locked&&c.origin==="starter").every(c=>c[S.seat])},
-  {n:5,name:"목도리",how:"룸메가 방에 들어오기",ok:()=>joined(other())}];
-const lookN=()=>{const n=+(S.room?.look||0);return IMG["look"+n]&&LOOKS[n]?.ok()?n:0};
+// 보라 꾸미기. 방에 하나뿐인 보라라 둘이 같이 본다.
+// 새싹은 같이 쓸수록 저절로 자라고(단계는 앞 단계를 거쳐야 함), 소품은 열리면 여러 개를 같이 걸칠 수 있다(room.wear)
+const GROW=[{name:"새싹",how:"처음부터",ok:()=>true},{name:"잎 네 장",how:"편지 3통 주고받기",ok:()=>S.reqs.filter(r=>!["rule","cancelled"].includes(r.stage)).length>=3},{name:"꽃봉오리",how:"같이 만든 카드 1장",ok:()=>S.agrs.length>=1},{name:"꽃",how:"같이 만든 카드를 1주 해보고 계속하기",ok:()=>S.agrs.some(a=>a.reviewedAt)}];
+const growN=()=>{let g=0;while(g<3&&IMG["grow"+(g+1)]&&GROW[g+1].ok())g++;return g};
+const ACC=[{k:"star",name:"별 핀",how:"내 카드 6장 다 정하기",ok:()=>S.cards.filter(c=>!c.locked&&c.origin==="starter").every(c=>c[S.seat])},{k:"scarf",name:"목도리",how:"룸메가 방에 들어오기",ok:()=>joined(other())}];
+const wearing=()=>ACC.filter(a=>IMG["acc_"+a.k]&&a.ok()&&S.room?.wear?.[a.k]).map(a=>a.k);
+const lookN=()=>IMG.grow0?1:0;
 const ELVES={bora:{name:"보라",map:"모자 요정"},monggeul:{name:"몽글",map:"소녀 요정"},ttobak:{name:"또박",map:"앞치마 요정"},mungge:{name:"뭉게",map:"구름 요정"}};
 const TONES={
   soft:{label:"부드럽게",desc:"'혹시', '괜찮으면'을 넣어 조심스럽게",style:"부드럽고 조심스럽게. '혹시', '괜찮으면' 같은 쿠션어를 한 번 쓴다."},
@@ -547,8 +545,8 @@ async function exportLog(){
 /* ---------- 그림 ---------- */
 function elfSVG(key,pose,label,cell,style){
   const k=ELF_R[pose]?pose:"stand",ln=k==="stand"?lookN():0,h=(k==="sleep"?cell*13:cell*20)*(ln?400/358:1);
-  // 꾸민 그림은 284x400 캔버스에 몸이 358 높이로 들어 있어 기본 그림과 몸 크기를 맞춘다
-  return `<div class="elf elf-${ln?"look"+ln:k}" role="img" aria-label="${esc(label)}" style="height:${Math.round(h)}px;width:${Math.round(h*(ln?284/400:ELF_R[k]))}px;${style||""}"></div>`;
+  // 서 있는 보라는 자라는 단계 그림 + 걸친 소품. 284x400 캔버스에 몸이 358 높이로 들어 있어 기본 그림과 몸 크기를 맞춘다
+  return `<div class="elf elf-${ln?"grow"+growN():k}" role="img" aria-label="${esc(label)}" style="height:${Math.round(h)}px;width:${Math.round(h*(ln?284/400:ELF_R[k]))}px;${style||""}">${ln?wearing().map(w=>`<i class="acc acc-${w}"></i>`).join(""):""}</div>`;
 }
 function iconSVG(name,bg){const r=ICONS[name]||ICONS.laptop;return `<svg viewBox="0 0 16 12" style="width:100%;height:auto;display:block" shape-rendering="crispEdges" aria-hidden="true"><rect width="16" height="12" fill="${bg}"/>${r.map(a=>`<rect x="${a[0]}" y="${a[1]}" width="${a[2]}" height="${a[3]}" fill="${a[4]}"/>`).join("")}</svg>`}
 function dialog(html){return `<div class="dwrap"><div class="nametag px3">${esc(elf().name)}</div><div class="dialog"><div class="dialog-in" aria-live="polite">${html}</div></div></div>`}
@@ -618,7 +616,7 @@ function homeView(){
   // GPT로 뽑은 이불(사람이 덮고 자는 모습)과 슬리퍼 그림을 방 위에 얹는다. 그림이 없으면 코드로 그린 그림자와 팻말
   const BED={A:[66,262],B:[326,262]},DESK={A:[100,122],B:[290,122]},BLANKET={A:[8,192,120,181],B:[265,192,120,181]},SLIP={A:[152,448],B:[212,448]};
   const props=["A","B"].map(x=>{const s_=x===me?(zMe?"sleep":outMe?"out":""):(zO?"sleep":outO?"out":"");
-    if(s_==="sleep"){const k="sleep"+x,bl=BLANKET[x];return IMG["prop_"+k]?`<div class="prop prop-${k} ${zMe||dayPart()==="night"?"dim":""}" style="left:${bl[0]}px;top:${bl[1]}px;width:${bl[2]}px;height:${bl[3]}px" aria-hidden="true"></div><div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]-40}px" aria-hidden="true"><span class="zz">z<b>z</b><i>Z</i></span></div>`:`<div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]}px" aria-hidden="true"><span class="lump"></span><span class="zz">z<b>z</b><i>Z</i></span></div>`}
+    if(s_==="sleep"){const k="sleep"+x,bl=BLANKET[x];return IMG["prop_"+k]?`<div class="prop prop-${k} ${zMe||dayPart()==="night"?"dim":""}" style="left:${bl[0]}px;top:${bl[1]}px;width:${bl[2]}px;height:${bl[3]}px;clip-path:inset(0 0 ${bl[1]+bl[3]-337}px 0)" aria-hidden="true"></div><div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]-40}px" aria-hidden="true"><span class="zz">z<b>z</b><i>Z</i></span></div>`:`<div class="sleeper" style="left:${BED[x][0]}px;top:${BED[x][1]}px" aria-hidden="true"><span class="lump"></span><span class="zz">z<b>z</b><i>Z</i></span></div>`}
     if(s_==="out"){const k="slip"+x;return IMG["prop_"+k]?`<div class="prop prop-${k} ${zMe||dayPart()==="night"?"dim":""}" style="left:${SLIP[x][0]}px;top:${SLIP[x][1]}px;width:30px;height:34px" aria-hidden="true"></div>`:`<div class="outsign" style="left:${DESK[x][0]}px;top:${DESK[x][1]}px" aria-hidden="true">외출 중</div>`}return ""}).join("");
   const bang=unsorted&&!f&&pose!=="sleep"?`<button class="bang" data-act="toCards" aria-label="안 정한 카드 ${unsorted}장" style="left:${mx+22}px;top:${my-92}px">!</button>`:"";
   const eh=pose==="sleep"?52:80;
@@ -746,7 +744,7 @@ function sortView(){
   if(!top)return `<div class="page">${header("카드 정하기",1)}<p class="say" style="text-align:center;margin-top:40px">다 정했어요.</p><div class="col"><button class="btn main px4" data-act="go" data-arg="home">우리 방으로</button><button class="btn px4" data-act="go" data-arg="cards">카드 보기</button></div></div>`;
   return `<div class="page">${header("카드 정하기",1)}<p class="sub" style="text-align:center;margin:0 0 10px">${un.length}장 남음</p>
 <div style="max-width:270px;margin:0 auto">${cardHTML(top)}</div>
-<div style="max-width:300px;margin:18px auto 0">${top.origin==="proposal"?`<p class="sub" style="margin:0 0 8px;text-align:center">지난번 일에서 ${esc(elf().name)}가 제안한 카드예요.</p>`:""}<p class="say" style="text-align:center">${nm(other())}가 이걸 하고 싶을 때</p>${seg3(top.id,null)}<label class="sub" for="condT" style="display:block;margin:12px 0 4px">"그냥 해도 돼"에 붙일 조건 (선택)</label><input id="condT" class="input" maxlength="40" placeholder="예: 먹고 나서 환기만 해줘"><p class="sub" style="margin-top:12px;text-align:center">내 답은 ${nm(other())}에게 그대로 보이지 않아요. ${esc(elf().name)}가 이 답을 보고 대신 말해줘요.</p></div></div>`;
+<div style="max-width:300px;margin:18px auto 0">${top.origin==="proposal"?`<p class="sub" style="margin:0 0 8px;text-align:center">지난번 일에서 ${esc(elf().name)}가 제안한 카드예요.</p>`:""}<p class="say" style="text-align:center">${nm(other())}가 이걸 하고 싶을 때</p>${seg3(top.id,S.sortO===top.id?"O":null)}${S.sortO===top.id?`<label class="say" for="condT" style="display:block;margin:14px 0 6px;font-size:16px">그냥 해도 돼. 대신 지켜줬으면 하는 게 있어? (없으면 비워둬)</label><input id="condT" class="input" maxlength="40" placeholder="예: 밤 11시 전에만, 먹고 나서 환기해줘"><div class="col"><button class="btn main px4" data-act="sortSave" data-arg="${top.id}">저장하고 다음 카드</button></div>`:""}<p class="sub" style="margin-top:12px;text-align:center">내 답은 ${nm(other())}에게 그대로 보이지 않아요. ${esc(elf().name)}가 이 답을 보고 대신 말해줘요.</p></div></div>`;
 }
 function cardDetail(id){
   const c=S.cards.find(x=>x.id===id);if(!c)return `<div class="page">${header("카드",1)}<p class="sub">이 카드를 찾을 수 없어요.</p></div>`;
@@ -758,7 +756,7 @@ function cardDetail(id){
   return `<div class="page">${header("카드",1)}<div style="max-width:200px;margin:0 auto 12px">${cardHTML(c)}</div>
 <h2 class="dh" style="margin-top:0">${nm(o)}가 이걸 하고 싶을 때, 나는</h2>
 ${seg3(c.id,mv)}
-${mv==="O"?`<label class="sub" for="condE" style="display:block;margin:10px 0 4px">조건 (선택)</label><div class="row" style="margin-top:0"><input id="condE" class="input" maxlength="40" style="flex:3" value="${esc(condOf(mine))}" placeholder="예: 먹고 나서 환기만 해줘"><button class="btn px4" data-act="setCond" data-arg="${c.id}">저장</button></div><p class="sub" style="margin:4px 0 0">${esc(elf().name)}가 이 조건에 맞는지 보고, 모르면 ${nm(o)}에게 먼저 물어봐요.</p>`:""}
+${mv==="O"?`<label class="sub" for="condE" style="display:block;margin:10px 0 4px">대신 지켜줬으면 하는 것 (선택)</label><div class="row" style="margin-top:0"><input id="condE" class="input" maxlength="40" style="flex:3" value="${esc(condOf(mine))}" placeholder="예: 먹고 나서 환기만 해줘"><button class="btn px4" data-act="setCond" data-arg="${c.id}">저장</button></div><p class="sub" style="margin:4px 0 0">${esc(elf().name)}가 이 조건에 맞는지 보고, 모르면 ${nm(o)}에게 먼저 물어봐요.</p>`:""}
 ${mine?`<p class="sub" style="margin:8px 0 0">요즘엔 아닌 것 같으면 "먼저 물어봐줘"로 바꾸면 돼요. 내 답이라 ${nm(o)}의 허락 없이 바꿀 수 있어요.</p>`:""}
 <h2 class="dh">내가 하고 싶을 때, ${nm(o)}는</h2><div class="mini"><span>${esc(theirTxt)}</span></div>
 <p class="why" style="margin-top:14px">${result}</p>
@@ -767,10 +765,12 @@ ${c.proposal?`<p class="sub" style="margin-top:12px">${esc(elf().name)}가 제�
 
 /* ---------- 화면: 설정, 시작 ---------- */
 function meView(){
-  const st=["sleep","out"].includes(S.room?.status?.[S.seat])?S.room.status[S.seat]:"in",cur=lookN();
-  const looks=LOOKS.filter(L=>L.n===0||IMG["look"+L.n]).map(L=>{const ok=L.ok();return `<button class="look ${cur===L.n?"on":""}" ${ok?`data-act="setLook" data-arg="${L.n}"`:"disabled"} aria-pressed="${cur===L.n}"><span class="elf-${L.n?"look"+L.n:"stand"} lookimg ${ok?"":"locked"}" aria-hidden="true"></span><span class="lookname">${ok?esc(L.name):"잠김"}</span><span class="lookhow">${ok?"":esc(L.how)}</span></button>`}).join("");
+  const st=["sleep","out"].includes(S.room?.status?.[S.seat])?S.room.status[S.seat]:"in",g=growN(),W=wearing();
+  const nextG=GROW[g+1];
+  const accs=ACC.filter(A=>IMG["acc_"+A.k]).map(A=>{const ok=A.ok(),on=W.includes(A.k);return `<button class="look ${on?"on":""}" ${ok?`data-act="wear" data-arg="${A.k}"`:"disabled"} aria-pressed="${on}"><span class="lookimg ${ok?"":"locked"}" aria-hidden="true" style="position:relative"><span class="elf-grow0" style="position:absolute;inset:0;opacity:.35"></span><i class="acc acc-${A.k}"></i></span><span class="lookname">${esc(A.name)}</span><span class="lookhow">${ok?(on?"걸치는 중":"걸치기"):esc(A.how)}</span></button>`}).join("");
   return `<div class="page">${header("내 프로필")}
-<h2 class="dh" style="margin-top:0">${esc(elf().name)} 꾸미기</h2><p class="sub" style="margin:0 0 8px">같이 쓸수록 하나씩 열려요. 룸메도 같은 ${esc(elf().name)}를 봐요.</p><div class="looks">${looks}</div>
+<div class="mini" style="gap:14px;align-items:center"><span style="flex:0 0 auto">${elfSVG(elfKey(),"stand","보라 지금 모습",3,"position:relative")}</span><span><b style="font-weight:400;font-size:18px">${esc(elf().name)} · ${esc(GROW[g].name)}</b><br><span class="sub" style="margin:0">${nextG?`다음: ${esc(nextG.name)} (${esc(nextG.how)})`:"다 자랐어요."}<br>둘이 같이 쓸수록 자라요. 룸메도 같은 ${esc(elf().name)}를 봐요.</span></span></div>
+<h2 class="dh">소품</h2><p class="sub" style="margin:0 0 8px">열린 소품은 여러 개를 같이 걸칠 수 있어요.</p><div class="looks">${accs}</div>
 <h2 class="dh">내 상태</h2><div class="seg">${[["in","깨어 있음"],["sleep","자는 중"],["out","외출 중"]].map(([k,v])=>`<button class="segb ${st===k?"on":""}" data-act="setSt" data-arg="${k}" aria-pressed="${st===k}">${v}</button>`).join("")}</div>
 <h2 class="dh">내 이름</h2><div class="row" style="margin-top:0"><input id="nameS" class="input" maxlength="8" style="flex:2" value="${esc(S.room?.names?.[S.seat]||"")}" placeholder="예: 현지"><button class="btn px4" data-act="saveName">저장</button></div><h2 class="dh">방</h2><div class="list"><div class="mini"><span>방 코드 </span><b class="dh" style="font-size:16px;font-weight:400;letter-spacing:.08em">${esc(S.code)}</b></div></div>
 <div class="col">${S.room?.demo?`<button class="btn px4" data-act="switchSeat">${nm(other())} 화면으로 보기</button><button class="btn px4" data-act="endDemo">둘러보기 끝내기</button>`:""}<button class="btn px4" data-act="export">기록 내보내기</button>${S.confirmLeave?`<div class="why" style="margin:0" role="alert">방을 나가도 방과 편지는 그대로 있어요. 다시 들어오려면 방 코드 <b class="dh" style="color:var(--ink);letter-spacing:.08em">${esc(S.code)}</b>가 필요해요. 이 기기에서는 첫 화면에 남겨둘게요.<div class="row"><button class="btn px4" data-act="leaveNo">취소</button><button class="btn main px4" data-act="leave">나가기</button></div></div>`:`<button class="btn px4" data-act="leaveAsk">방 나가기</button>`}</div>
@@ -850,7 +850,7 @@ document.addEventListener("click",async e=>{
   else if(a==="setCond"){const c=S.cards.find(x=>x.id===arg);const t=($("#condE")?.value||"").trim().slice(0,40);if(c?.[S.seat]){await sortCard({...c,redo:S.seat},vOf(c[S.seat]),t);announce("조건을 저장했어요")}}
   else if(a==="toggleCard"){const c=S.cards.find(x=>x.id===arg);if(c){const off=!c["off_"+S.seat];await db.doc(`rooms/${S.code}/cards/${c.id}`).update({["off_"+S.seat]:off,editedBy:S.seat,editedAt:Date.now(),editKind:off?"off":"on"});announce(off?"카드를 껐어요":"카드를 켰어요")}}
   else if(a==="endDemo"){leave()}
-  else if(a==="setLook"){await roomRef().update({look:+arg});announce(`${elf().name} 모습을 바꿨어요`)}
+  else if(a==="wear"){const on=!S.room?.wear?.[arg];await mergeIn(roomRef(),{wear:{[arg]:on}});announce(on?"걸쳤어요":"벗었어요")}
   else if(a==="cancel"||a==="ok"){S.flow=null;render()}
   else if(a==="sendClarify"||a==="skipClarify"){const f=S.flow,ans=a==="sendClarify"?($("#clT")?.value||"").trim():"";b.disabled=true;const t=ans?`${f.text} (${ans})`:f.text;if(f.kind==="request")await submitAsk(t,true,true);else await submitSay(t,true)}
   else if(a==="confirmAsk"){const t=($("#askF")?.value||"").trim();if(!t)return;b.disabled=true;await sendAsk(t,S.flow?.facts||[])}
@@ -872,7 +872,9 @@ document.addEventListener("click",async e=>{
   else if(a==="dismissAgr"){S.dismissed["agr"+arg]=1;render()}
   else if(a==="dismissEdit"){const [id,at]=arg.split("|");S.dismissed["edit"+id+at]=1;render()}
   else if(a==="cond"){const [id,t]=arg.split("|");condSel[id]=condSel[id]===t?"":t;render()}
-  else if(a==="sort"){const [id,v]=arg.split("|");const c=S.cards.find(x=>x.id===id);if(c){b.disabled=true;await sortCard(c[S.seat]?{...c,redo:S.seat}:c,v,v!=="X"?(($("#condT")?.value||"").trim().slice(0,40)||condOf(c[S.seat])||""):"");if($("#condT"))$("#condT").value="";delete condSel[id];announce("저장했어요: "+VLAB[v])}}
+  else if(a==="sort"&&S.route.name==="sort"&&arg.endsWith("|O")){S.sortO=arg.split("|")[0];render();$("#condT")?.focus()}
+  else if(a==="sortSave"){const c=S.cards.find(x=>x.id===arg);if(c){b.disabled=true;await sortCard(c[S.seat]?{...c,redo:S.seat}:c,"O",($("#condT")?.value||"").trim().slice(0,40));S.sortO=null;announce("저장했어요: 그냥 해도 돼")}}
+  else if(a==="sort"){const [id,v]=arg.split("|");if(v==="X")S.sortO=null;const c=S.cards.find(x=>x.id===id);if(c){b.disabled=true;await sortCard(c[S.seat]?{...c,redo:S.seat}:c,v,v!=="X"?(($("#condT")?.value||"").trim().slice(0,40)||condOf(c[S.seat])||""):"");if($("#condT"))$("#condT").value="";delete condSel[id];announce("저장했어요: "+VLAB[v])}}
   else if(a==="resetCard"){const c=S.cards.find(x=>x.id===arg);if(c){await resetCard(c);go("sort")}}
   else if(a==="export"){await exportLog()}
   else if(a==="leaveAsk"){S.confirmLeave=true;render()}

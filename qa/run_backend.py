@@ -14,7 +14,7 @@ async def main():
     code=await pg.evaluate("S.code");print('room',code)
     await pg.click('[data-act="shareDone"]');await pg.click('[data-act="obDone"][data-arg="cards"]');await pg.wait_for_timeout(400)
     for _ in range(6):
-      await pg.click('[data-act="sort"][data-arg$="|O"]');await pg.wait_for_timeout(250)
+      await pg.click('[data-act="sort"][data-arg$="|O"]');await pg.wait_for_timeout(200);await pg.click('[data-act="sortSave"]');await pg.wait_for_timeout(250)
     await pg.screenshot(path=OUT+'/be_03_cardsA.png')
     # 룸메가 들어오기 전에 보낸 편지: 들고 있다가 룸메가 들어오면 전한다
     fails=[]
