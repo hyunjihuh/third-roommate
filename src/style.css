@@ -138,7 +138,10 @@ b,strong,h1,h2,h3{font-weight:400}
 /* v3.1: 화면 이동 때 제목에 주는 포커스는 읽기용이라 테두리를 그리지 않는다 */
 h1[tabindex="-1"]:focus{outline:none}
 /* 편지 위 지금 단계 */
-.stline{margin:0 0 12px;padding:8px 14px;background:var(--paper2);border-radius:999px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:inset 0 0 0 2px var(--elf-l)}
+.stline{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.stpill{padding:4px 12px;border-radius:999px;font-family:var(--ft);font-size:14px;line-height:1.4;background:var(--paper2);color:var(--ink);box-shadow:inset 0 0 0 2px var(--elf-l)}
+.st-delivered,.st-constraints,.st-aligning{background:var(--postit);box-shadow:inset 0 0 0 2px var(--line)}.st-agreed,.st-direct{background:#B7E3A0}.st-blocked,.st-rule,.st-cancelled{background:#F7D3C8}
+.stdot{padding:3px 9px;border-radius:999px;font-size:13px;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--elf-l)}.stdot::before{content:"○ "}.stdot.on{color:var(--ink);background:var(--paper)}.stdot.on::before{content:"● "}
 /* 대안: 카드 자체가 고르는 버튼 */
 .opts{display:flex;flex-direction:column;gap:10px}
 .opt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:13px 14px 14px;border:none;border-radius:14px;background:var(--paper);box-shadow:inset 0 0 0 2.5px var(--line),inset 0 -6px 0 0 var(--elf-l);color:var(--ink);text-align:left;font:inherit;cursor:pointer}

@@ -147,7 +147,10 @@ b,strong,h1,h2,h3{font-weight:400}
 /* v3.1: 화면 이동 때 제목에 주는 포커스는 읽기용이라 테두리를 그리지 않는다 */
 h1[tabindex="-1"]:focus{outline:none}
 /* 편지 위 지금 단계 */
-.stline{margin:0 0 12px;padding:8px 14px;background:var(--paper2);border-radius:999px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:inset 0 0 0 2px var(--elf-l)}
+.stline{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.stpill{padding:4px 12px;border-radius:999px;font-family:var(--ft);font-size:14px;line-height:1.4;background:var(--paper2);color:var(--ink);box-shadow:inset 0 0 0 2px var(--elf-l)}
+.st-delivered,.st-constraints,.st-aligning{background:var(--postit);box-shadow:inset 0 0 0 2px var(--line)}.st-agreed,.st-direct{background:#B7E3A0}.st-blocked,.st-rule,.st-cancelled{background:#F7D3C8}
+.stdot{padding:3px 9px;border-radius:999px;font-size:13px;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--elf-l)}.stdot::before{content:"○ "}.stdot.on{color:var(--ink);background:var(--paper)}.stdot.on::before{content:"● "}
 /* 대안: 카드 자체가 고르는 버튼 */
 .opts{display:flex;flex-direction:column;gap:10px}
 .opt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:13px 14px 14px;border:none;border-radius:14px;background:var(--paper);box-shadow:inset 0 0 0 2.5px var(--line),inset 0 -6px 0 0 var(--elf-l);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
@@ -791,6 +794,7 @@ function homeView(){
     if(queued||waiting){pose="letter"}
     const invite=!joined(o)?`<div class="why" style="margin:0 0 10px">룸메가 아직 방에 안 들어왔어요. 초대 링크나 코드 <b class="dh" style="letter-spacing:.08em;color:var(--ink)">${esc(S.code)}</b>를 보내주세요. <button class="lnk" data-act="${S.online?"copyLink":"copyCode"}">${S.online?"초대 링크 복사":"코드 복사"}</button></div>`:"";
     const asleep=st[me]==="sleep"?`<div class="why" style="margin:0 0 10px">나는 자는 중이에요. 그동안 오는 편지는 ${esc(elf().name)}가 들고 있다가 깨면 전해줘요. <button class="lnk" data-act="setSt" data-arg="in">깨어 있음으로 바꾸기</button></div>`:"";
+    if(st[me]==="sleep")body=`${invite}<p class="say">나는 자는 중이에요.\n그동안 오는 편지는 ${esc(elf().name)}가 들고 있다가 깨면 전해줘요.</p>${choices([["setSt","일어났어","in"]])}`;else
     body=`${invite}${asleep}${hold?`<div class="why" style="margin:0 0 10px">${esc(hold[0])} <button class="lnk" data-act="go" data-arg="thread|${hold[1]}">편지 보기</button></div>`:""}<label class="say" for="sayT">${hold?"다른 할 말이 있어요?":"무슨 일이에요?"}</label><div class="row" style="margin-top:0"><input id="sayT" class="input" maxlength="120" placeholder="예: 지금 방에서 통화해도 돼?" style="flex:3"><button class="btn main px4" data-act="say">말하기</button></div>${unsorted?`<button class="lnk" data-act="toCards">카드 먼저 정하기</button>`:""}`}
   // 보라는 자지 않는다. 자는 사람은 그 사람 침대 이불이 불룩하고 z가 뜬다. 외출 중이면 그 사람 책상에 팻말
   const zMe=st[me]==="sleep",zO=joined(o)&&st[o]==="sleep",outO=joined(o)&&st[o]==="out",outMe=st[me]==="out";
@@ -807,7 +811,7 @@ ${S.room?.demo?`<button class="chip px4 demo-end" data-act="endDemo">둘러보�
 /* ---------- 알림함: 답이 필요 없는 소식은 대화창 대신 여기 ---------- */
 function notes(){const me=S.seat,o=other(),N=[];
   for(const c of S.cards)if(c.editedBy===o&&c.editedAt)N.push({t:c.editedAt,txt:`${nm(o)}가 "${esc(c.title)}" 카드를 ${c.editKind==="off"?"껐어요":c.editKind==="on"?"다시 켰어요":"고쳤어요"}.`,go:"card|"+c.id});
-  for(const a of S.agrs)if(a.state==="off"&&a.endedBy===o&&a.endedAt)N.push({t:a.endedAt,txt:`${nm(o)}가 같이 만든 카드에서 나갔어요. "${esc(nameT(a.text))}"`});
+  for(const a of S.agrs)if(a.state==="off"&&a.endedBy===o&&a.endedAt)N.push({t:a.endedAt,txt:`${nm(o)}가 같이 만든 카드를 그만했어요. "${esc(nameT(a.text))}"`});
   for(const r of S.reqs)if(r.to===me&&(r.stage==="fyi"||(r.stage==="done"&&r.c1?.trial)))N.push({t:r.ts,txt:`${nm(r.from)}가 알려왔어요. ${esc(nameT(r.translations?.[me]||r.draft))}`,go:"thread|"+r.id});
   return N.sort((a,b)=>b.t-a.t).slice(0,30)}
 const noteKey=()=>"noteSeen_"+S.code+S.seat;
@@ -827,21 +831,11 @@ ${rest.length?`<h2 class="sec">${todo.length?"지난 편지":"오간 편지"}</h
 ${all.length?"":`<p class="sub" style="margin-top:30px;text-align:center">아직 오간 편지가 없어요.<br>우리 방에서 ${esc(elf().name)}에게 말해보세요.</p>`}</div>`;
 }
 // 편지 위에 붙는 지금 단계 한 줄
-function stageLine(r){const me=S.seat,N=nm;
-  switch(r.stage){
-    case "direct":return `${esc(elf().name)}가 카드를 보고 바로 답했어요. ${N(r.to)}에게는 안 갔어요.`;
-    case "rule":return `기숙사 규칙이라 ${N(r.to)}에게 전하지 않았어요.`;
-    case "fyi":return r.to===me?"알림이에요. 답은 안 해도 돼요.":`${N(r.to)}에게 알림만 남겼어요.`;
-    case "queued":return joined(r.to)?`${N(r.to)} 자는 중. 일어나면 전해져요.`:"룸메가 방에 들어오면 전해져요.";
-    case "delivered":return r.to===me?"내 답을 기다리고 있어요.":`${N(r.to)}의 답을 기다리는 중이에요.`;
-    case "replied":return r.from===me?`${N(r.to)}가 답했어요.`:"답을 보냈어요.";
-    case "done":return "끝난 편지예요.";
-    case "constraints":return `각자 조건 듣는 중 · ${["A","B"].map(x=>`${N(x)} ${r.consDone?.[x]?"답함":"아직"}`).join(" · ")}`;
-    case "aligning":return `대안 고르는 중 · ${["A","B"].map(x=>`${N(x)} ${r.picks?.[x]?.v===r.version?"골랐음":"아직"}`).join(" · ")}`;
-    case "agreed":return r.once?"둘 다 같은 안을 골랐어요. 이번 한 번만 정한 일이에요.":"둘 다 같은 안을 골라서 카드가 됐어요.";
-    case "blocked":return "여기서 멈췄어요.";
-    case "cancelled":return "보낸 사람이 취소했어요.";
-  }return ""}
+// 편지 위 단계 표시: 짧은 이름표 + (필요할 때) 둘의 진행 점
+function stageLine(r){const me=S.seat,N=nm,dot=(x,ok)=>`<span class="stdot ${ok?"on":""}">${N(x)}</span>`;
+  const t=({direct:"보라가 바로 답함",rule:"기숙사 규칙 · 전하지 않음",fyi:"알림",queued:joined(r.to)?"자는 중 · 깨면 전달":"룸메 들어오면 전달",delivered:r.to===me?"내 답 차례":"답 기다리는 중",replied:r.from===me?"답 옴":"답 보냄",done:"끝",constraints:"조건 답하기",aligning:"대안 고르기",agreed:r.once?"합의 · 이번만":"합의 · 카드가 됨",blocked:"멈춤 · 직접 얘기 필요",cancelled:"취소됨"})[r.stage]||"";
+  const dots=r.stage==="constraints"?["A","B"].map(x=>dot(x,r.consDone?.[x])).join(""):r.stage==="aligning"?["A","B"].map(x=>dot(x,r.picks?.[x]?.v===r.version)).join(""):"";
+  return `<span class="stpill st-${r.stage}">${t}</span>${dots}`}
 const routeTxt=(route,to)=>({covered_by_agreement:"카드 범위 안이라 바로 답",clarification_needed:"정보가 더 필요함",coordination_needed:`${nm(to)}에게 물어봐야 함`,rule:"기숙사 규칙에 걸림"})[route]||"-";
 const stripWho=t=>String(t||"").replace(/^[AB]\s*[:가이는은]?\s+/,"");
 function threadView(id){
@@ -849,7 +843,7 @@ function threadView(id){
   const me=S.seat,o=other(),t=r.translations?.[r.to],part=r.from===me||r.to===me;
   const body=(r.to===me&&t)?nameT(t):(r.draft||r.text);
   const paper=(to,from,txt,extra,at)=>`<div class="letter"><p class="l-to">${nm(to)}에게</p><p class="l-body">${esc(txt)}</p>${extra||""}<p class="l-from">${at?when(at)+" · ":""}${nm(from)}</p></div>`;
-  let h=`<p class="stline">${stageLine(r)}</p>`;
+  let h=`<div class="stline">${stageLine(r)}</div>`;
   h+=paper(r.to,r.from,body,factChips(r.facts)+(r.to===me&&t?`<details class="l-more"><summary>보낸 그대로 보기</summary><p>${esc(r.draft)}</p></details>`:""),r.ts);
   if(r.c1&&r.from===me)h+=`<details class="l-more out"><summary>${esc(elf().name)}가 이렇게 읽었어요: ${routeTxt(r.c1.route,r.to)}</summary><p>${esc(nameT(r.c1.reason||""))}${(r.c1.evidence_ids||[]).length?`<br>본 카드: ${r.c1.evidence_ids.map(cid=>`<button class="lnk" data-act="go" data-arg="${evGo(cid)}">${esc(nameT(evTitle(cid)))}</button>`).join(", ")}`:""}</p></details>`;
   // 답장은 답한 사람 본인의 말로 (전해 들은 말투 "어렵대요"는 우리 방 대화창에서만)
@@ -873,12 +867,12 @@ function threadView(id){
   else if(r.from===me&&r.stage==="replied")act=`<div class="col">${r.reply.choice==="hard"?`<button class="btn main px4" data-act="align" data-arg="${r.id}">같이 맞춰보기</button>`:""}<button class="btn px4" data-act="ack" data-arg="${r.id}">${r.reply.choice==="hard"?"다음에 할게":"알겠어"}</button></div>`;
   else if(r.stage==="constraints"&&part&&!r.consDone?.[me]){
     const c2=S.c2[r.id];if(!c2)setTimeout(()=>loadC2(r),0);
-    act=c2?.questions?`<p class="sub" style="margin-top:14px">${esc(elf().name)}가 나한테만 묻는 질문이에요. ${nm(o)}는 내 답을 못 봐요. 대안을 만들 때 써도 되는 답에만 체크해요.</p>${c2.questions.map((q,i)=>`<div class="mini" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:8px"><label for="ca${i}">${esc(q)}</label><textarea id="ca${i}" class="input" rows="2" placeholder="답하지 않아도 돼요"></textarea><label class="chk"><input type="checkbox" id="cs${i}"> 대안 만들 때 써도 돼요</label></div>`).join("")}<div class="col"><button class="btn main px4" data-act="consSubmit" data-arg="${r.id}">답 보내기</button></div>`:`<p class="sub" style="margin-top:14px">질문을 고르는 중이에요.</p>`;
+    act=c2?.questions?`<p class="sub" style="margin-top:14px">${esc(elf().name)}가 나한테만 묻는 질문이에요. ${nm(o)}는 내 답을 못 봐요. 대안을 만들 때 꼭 반영되었으면 하는 답에만 체크해요.</p>${c2.questions.map((q,i)=>`<div class="mini" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:8px"><label for="ca${i}">${esc(q)}</label><textarea id="ca${i}" class="input" rows="2" placeholder="답하지 않아도 돼요"></textarea><label class="chk"><input type="checkbox" id="cs${i}" aria-label="이 답 꼭 반영하기"> 꼭 반영</label></div>`).join("")}<div class="col"><button class="btn main px4" data-act="consSubmit" data-arg="${r.id}">답 보내기</button></div>`:`<p class="sub" style="margin-top:14px">질문을 고르는 중이에요.</p>`;
   }
   else if(r.stage==="constraints"&&part)act=`<p class="l-note">내 답을 보냈어요. ${nm(o)}도 답하면 ${esc(elf().name)}가 둘 다 괜찮을 방법을 찾아요.</p>`;
   else if(r.from===me&&(r.stage==="delivered"||r.stage==="queued"))act=`<div class="col"><button class="btn px4" data-act="cancelReq" data-arg="${r.id}">보낸 것 취소하기</button></div>`;
   else if(r.to===me&&r.stage==="fyi")act=`<div class="col"><button class="btn main px4" data-act="fyiOk" data-arg="${r.id}">확인했어</button></div>`;
-  return `<div class="page">${header("편지",1)}${h}${act}</div>`;
+  return `<div class="page">${header(r.kind==="review"?"편지 쓰기":"편지",1)}${h}${act}</div>`;
 }
 
 /* ---------- 화면: 카드 ---------- */
@@ -890,16 +884,16 @@ const evGo=id=>String(id).startsWith("g_")?"agr|"+String(id).slice(2):"card|"+id
 function agrLeft(a){return Math.ceil((a.until-Date.now())/864e5)}
 function agrRow(a){
   const left=agrLeft(a);
-  return `<div class="mini item" data-act="go" data-arg="agr|${a.id}" role="button" tabindex="0"><span style="display:flex;align-items:center;gap:10px"><span style="width:36px;flex-shrink:0">${iconSVG("friends","#FFE58A")}</span><span>${esc(a.text)}<br><span style="font-size:14px;font-family:var(--fs);color:var(--muted)">같이 만든 카드</span></span></span><span class="dh state" style="color:${left>0?"#8A6A00":"var(--alert)"}">${left>0?`1주 체험 중<br>${left}일 남음`:"1주 지남<br>어땠어요?"}</span></div>`;
+  return `<div class="mini item" data-act="go" data-arg="agr|${a.id}" role="button" tabindex="0"><span style="display:flex;align-items:center;gap:10px"><span style="width:36px;flex-shrink:0">${iconSVG("friends","#FFE58A")}</span><span>${esc(a.text)}<br><span style="font-size:14px;font-family:var(--fs);color:var(--muted)">같이 만든 카드</span></span></span><span class="dh state" style="color:${left>0?"#8A6A00":"var(--alert)"}">${left>0?`체험 D-${left}`:"체험 끝"}</span></div>`;
 }
 function agrDetail(id){
   const a=S.agrs.find(x=>x.id===id);if(!a||a.state==="off")return `<div class="page">${header("카드",1)}<p class="sub">이 카드는 이제 없어요.</p></div>`;
-  const left=agrLeft(a),op=a.option||{},rows=["A","B"].filter(x=>op.adjustments_by_person?.[x]).map(x=>[x,"맞춤",op.adjustments_by_person[x]]);
+  const left=agrLeft(a),rows=[];
   const end=new Date(a.until),endTxt=`${end.getMonth()+1}월 ${end.getDate()}일`,late=left<=2;
-  return `<div class="page">${header("카드",1)}<div style="max-width:280px;margin:4px auto 16px"><div class="bigcard px6"><div style="background:#FFF1B8"><div class="ttag" style="background:var(--postit);display:flex;justify-content:space-between"><span>같이 만든 카드</span><span>${left>0?"1주 체험 중":"1주 지남"}</span></div>${a.art?`<span class="art art-${a.art}"></span>`:""}<div style="padding:22px 20px 20px"><p style="margin:0;font-size:18px;line-height:1.45;text-align:center">${esc(nameT(a.text))}</p></div></div></div></div>
-<div class="list">${rows.map(([x,k,v])=>`<div class="mini"><span><b style="color:var(--${x==="A"?"a":"b"});font-weight:400">${nm(x)} ${k}</b> · ${esc(nameT(stripWho(v)))}</span></div>`).join("")}<div class="mini"><span>상태</span><span class="dh" style="color:#8A6A00">${left>0?`1주 체험 중, ${left}일 남음`:"1주가 지났어요"}</span></div></div>
+  return `<div class="page">${header("카드",1)}<div style="max-width:280px;margin:4px auto 16px"><div class="bigcard px6"><div style="background:#FFF1B8"><div class="ttag" style="background:var(--postit);display:flex;justify-content:space-between"><span>같이 만든 카드</span><span>${left>0?"체험 D-"+left:"체험 끝"}</span></div>${a.art?`<span class="art art-${a.art}"></span>`:""}<div style="padding:22px 20px 20px"><p style="margin:0;font-size:18px;line-height:1.45;text-align:center">${esc(nameT(a.text))}</p></div></div></div></div>
+<div class="list">${rows.map(([x,k,v])=>`<div class="mini"><span><b style="color:var(--${x==="A"?"a":"b"});font-weight:400">${nm(x)} ${k}</b> · ${esc(nameT(stripWho(v)))}</span></div>`).join("")}</div>
 <p class="why" style="margin-top:12px">${left>0?`${endTxt}에 ${esc(elf().name)}가 둘에게 어땠는지 물어볼게요. 그동안 이 카드에 맞는 일은 바로 답하고 룸메에게 알림만 남겨요.`:"1주 해봤어요. 계속할지, 바꿀지, 그만할지 골라요."}</p>
-<div class="col">${late?`<button class="btn main px4" data-act="agrKeep" data-arg="${a.id}">${left>0?"1주 더 하기":"계속하기"}</button>`:""}<button class="btn px4" data-act="agrChange" data-arg="${a.id}">수정하기</button><button class="btn px4" data-act="agrEnd" data-arg="${a.id}">나가기</button><p class="sub" style="margin:2px 0 0">수정은 둘이 다시 맞춰서 바꿔요. 나가기는 혼자 해도 되고, 그 뒤엔 이 일도 ${esc(elf().name)}가 먼저 물어봐요.</p><button class="lnk" data-act="go" data-arg="thread|${a.from}">어떻게 정했는지 보기</button></div></div>`;
+<div class="col">${late?`<button class="btn main px4" data-act="agrKeep" data-arg="${a.id}">${left>0?"1주 더 하기":"계속하기"}</button>`:""}<button class="btn px4" data-act="agrChange" data-arg="${a.id}">수정하기</button><button class="btn px4" data-act="agrEnd" data-arg="${a.id}">그만하기</button><p class="sub" style="margin:2px 0 0">수정은 둘이 다시 맞춰서 바꿔요. 그만하기는 혼자 해도 되고, 그 뒤엔 이 일도 ${esc(elf().name)}가 먼저 물어봐요.</p><button class="lnk" data-act="go" data-arg="thread|${a.from}">어떻게 정했는지 보기</button></div></div>`;
 }
 /* 카드 그림: 지피티로 뽑은 9칸 시트를 잘라 앱 안에 넣은 것 (src/img/card1-9.webp) */
 const ART_N={phone:1,dryer:2,lamp:3,laptop:4,friends:5,fridge:6};
@@ -919,7 +913,7 @@ function tile(c){
 }
 function agrTile(a){
   const left=agrLeft(a);
-  return `<button class="tile" data-act="go" data-arg="agr|${a.id}"><span class="tile-in" style="background:#FFF1B8"><span class="ttag" style="background:var(--postit)">같이 만든 카드</span>${a.art?`<span class="art art-${a.art}"></span>`:""}<span class="tname ${a.art?"":"big"}">${esc(nameT(a.text))}</span><span class="tstate" style="background:${left>0?"var(--postit)":"#F5B8A8"}">${left>0?`1주 체험 중 · ${left}일`:"1주 지남"}</span></span></button>`;
+  return `<button class="tile" data-act="go" data-arg="agr|${a.id}"><span class="tile-in" style="background:#FFF1B8"><span class="ttag" style="background:var(--postit)">같이 만든 카드</span>${a.art?`<span class="art art-${a.art}"></span>`:""}<span class="tname ${a.art?"":"big"}">${esc(nameT(a.text))}</span><span class="tstate" style="background:${left>0?"var(--postit)":"#F5B8A8"}">${left>0?`체험 D-${left}`:"체험 끝"}</span></span></button>`;
 }
 function cardsView(){
   const me=S.seat,un=S.cards.filter(c=>!c[me]&&!c.locked),done=S.cards.filter(c=>c[me]&&!c.locked),rules=S.cards.filter(c=>c.locked),on=S.agrs.filter(a=>a.state!=="off");
