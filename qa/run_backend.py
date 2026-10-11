@@ -24,7 +24,7 @@ async def main():
     await pg.click('[data-act="go"][data-arg="home"]')
     chk('룸메 없을 때 상단 칩', '룸메 아직 안 들어옴' in await pg.inner_text('.hud'))
     await pg.fill('#sayT','방에서 과외해도 돼?');await pg.click('[data-act="say"]');await pg.wait_for_timeout(400)
-    await pg.click('[data-act="kindDo"]');await pg.wait_for_timeout(600)
+    await pg.wait_for_timeout(600)
     chk('보낸 뒤: 룸메가 들어오면 전할게요', '룸메가 방에 들어오면 전할게요' in await pg.inner_text('.dialog'))
     await pg.click('[data-act="ok"]');await pg.wait_for_timeout(300)
     chk('홈: 편지를 들고 있음', '룸메가 들어오면 전할 편지' in await pg.inner_text('.dialog'))
@@ -41,7 +41,7 @@ async def main():
     for _ in range(3):
       await pg.click('[data-act="sort"][data-arg$="|X"]');await pg.wait_for_timeout(250)
     await pg.click('[data-act="go"][data-arg="home"]');await pg.fill('#sayT','지금 방에서 통화해도 돼?');await pg.click('[data-act="say"]');await pg.wait_for_timeout(500);await pg.screenshot(path=OUT+'/be_06_B_pickKind.png')
-    await pg.click('[data-act="kindDo"]');await pg.wait_for_timeout(700);await pg.screenshot(path=OUT+'/be_07_B_sent.png')
+    await pg.wait_for_timeout(700);await pg.screenshot(path=OUT+'/be_07_B_sent.png')
     print('reqs',await pg.evaluate("S.reqs.map(r=>r.stage+':'+r.draft)"),'cards',await pg.evaluate("S.cards.map(c=>c.id+(c.A?.v||'-')+(c.B?.v||'-')).join(' ')"))
     await pg.evaluate("leave();localStorage.setItem('dev',window.__devA)");await pg.fill('#codeT',code);await pg.click('[data-act="join"][data-arg="auto"]');print('seat after rejoin',await pg.evaluate("S.seat"));await pg.wait_for_timeout(900);await pg.screenshot(path=OUT+'/be_08_A_letter.png')
     print('A sees', await pg.inner_text('.dialog'))
