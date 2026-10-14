@@ -3,7 +3,7 @@ from playwright.async_api import async_playwright
 import os
 FONTCSS=[p for p in ['/tmp/claude-0/-home-claude/5f0b4b9c-4e81-5c9c-8a2b-c6e8350675c2/scratchpad/fonts/node_modules/@fontsource/jua/index.css','/tmp/claude-0/-home-claude/5f0b4b9c-4e81-5c9c-8a2b-c6e8350675c2/scratchpad/fonts/node_modules/@fontsource/gowun-dodum/index.css'] if os.path.exists(p)]  # 오프라인 QA용 글꼴 (없으면 건너뜀)
 HERE=os.path.dirname(os.path.abspath(__file__))
-OUT=os.path.join(HERE,'shots2x_b');os.makedirs(OUT,exist_ok=True)
+OUT=os.path.join(HERE,'shots2x_c');os.makedirs(OUT,exist_ok=True)
 CHECK=r"""()=>{const bad=[];const vw=innerWidth,vh=innerHeight;document.querySelectorAll('#app *').forEach(el=>{const cs=getComputedStyle(el);if(cs.display==='none'||el.closest('.vh')||el.closest('svg'))return;const r=el.getBoundingClientRect();if(!r.width||!r.height)return;
  if(el.scrollWidth>el.clientWidth+1&&cs.overflowX!=='auto'&&cs.overflowX!=='scroll'&&el.clientWidth>0&&!el.matches('.world,.stage,.scene,.m'))bad.push('가로넘침 '+el.tagName+'.'+el.className+' '+(el.innerText||'').slice(0,30));
  if(r.right>vw+1&&!el.closest('.world'))bad.push('화면밖 '+el.tagName+'.'+el.className+' '+(el.innerText||'').slice(0,30)+' r='+Math.round(r.right));});return [...new Set(bad)].slice(0,15)}"""
@@ -130,6 +130,22 @@ async def main():
         await pg.fill('#clT','7시 반');await act('sendClarify');await pg.wait_for_timeout(600)
       await shot('ask_confirm')
       if await has('[data-act="confirmAsk"]'): await act('confirmAsk');await pg.wait_for_timeout(500);await shot('ask_sent')
+      if await has('.dialog [data-act="ok"]'): await act('ok')
+      await sw();await pg.wait_for_timeout(1200)
+      for _ in range(3):
+        t=await pg.inner_text('.dialog') if await has('.dialog') else ''
+        if '드라이기' in t: break
+        if await has('[data-act="fyiOk"]'): await act('fyiOk')
+        elif await has('.dialog [data-act="ok"]'): await act('ok')
+        else: break
+      await shot('wish_B_incoming')
+      if await has('[data-act="rCond"]'):
+        await act('rCond');await pg.wait_for_timeout(300)
+        if await has('#noteT'): await pg.fill('#noteT','7시 반 전엔 욕실에서 말려줘')
+        await shot('wish_B_cond')
+        if await has('[data-act="rSend"]'): await act('rSend');await pg.wait_for_timeout(500)
+      await sw();await pg.wait_for_timeout(800);await shot('wish_A_reply')
+      if await has('.dialog [data-act="ack"]'): await act('ack');await pg.wait_for_timeout(800);await shot('wish_A_done')
       await act('go','letters');await shot('letters_end')
       await act('go','home');await act('go','me');await shot('me')
       await check('내 프로필: 자라기와 소품',must=['소품','다음:'])
