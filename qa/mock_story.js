@@ -15,9 +15,10 @@ function coll(path,ord,lim){const q={
  onSnapshot:(cb)=>{const f=()=>{let docs=[...store.keys()].filter(k=>k.startsWith(path+'/')&&k.slice(path.length+1).indexOf('/')<0).map(k=>({id:k.split('/').pop(),data:()=>clone(store.get(k))}));if(ord){docs.sort((a,b)=>(a.data()[ord[0]]-b.data()[ord[0]])*(ord[1]==='desc'?-1:1))}if(lim)docs=docs.slice(0,lim);cb({docs})};subs.push(f);f();return()=>{}}};return q}
 const db={doc:docRef,collection:(p)=>coll(p)};
 window.__prompts=[];
-const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setTimeout(r,60));
+const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setTimeout(r,window.__delay||60));
  if(p.includes('[C0'))return p.split('<private_complaint>')[1].split('</private_complaint>')[0].includes('(')?{draft:"평일 아침 7시 반에 드라이기 소리 때문에 깨는 날이 있어. 그 시간엔 욕실에서 말려줄 수 있어?",clarification:"",missing_fields:[],key_facts:["평일 아침","7시 반","드라이기","욕실"],unsafe:false}:{draft:"",clarification:"보통 몇 시쯤이야?",missing_fields:["time"],key_facts:[]};
  if(p.includes('[C1')){const req=p.split('<request>')[1];const g=(p.match(/id: (g_\S+|id\S+)/)||[])[1];
+   if(req.includes('통화'))return {kind:"permission",action:"방에서 통화",time:"오늘 밤 10시",duration:"10분",route:"covered_by_agreement",evidence_ids:["s4"],cond_check:"met",missing_fields:[],hour:22,minutes:10,reason:"통화 카드에서 바다가 15분 안이면 괜찮다고 했고 10분이에요.",unsafe:false};
    if(req.includes('드라이기'))return {kind:"request",route:"coordination_needed",evidence_ids:[],missing_fields:[],reason:"룸메가 하는 일을 바꿔 달라는 부탁이에요."};
    if(req.includes('11시')&&g)return {kind:"permission",action:"스탠드 켜고 과제",time:"오늘 밤 11시까지",duration:"",route:"covered_by_agreement",evidence_ids:[g],missing_fields:[],hour:23,minutes:0,reason:"같이 만든 카드의 12시 전 범위 안이에요.",unsafe:false};
    return {kind:"permission",action:"스탠드 켜고 과제",time:"오늘 밤 12시 넘어서",duration:"1시간",route:"coordination_needed",evidence_ids:["s2"],missing_fields:[],hour:0,minutes:60,reason:"밤늦게 방에서 공부하기 카드는 바다가 먼저 물어봐 달라고 했어요.",unsafe:false};}
