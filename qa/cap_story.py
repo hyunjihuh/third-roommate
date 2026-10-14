@@ -43,7 +43,7 @@ async def main():
     await pg.click('.dialog [data-act="align"]');await pg.wait_for_timeout(900);await shot('A_constraints')
     await pg.fill('#ca0','내일 마감이라 오늘은 꼭 끝내야 해');await pg.check('#cs0');await pg.fill('#ca1','12시 넘으면 동방 가도 돼');await pg.check('#cs1')
     await act('consSubmit');await pg.wait_for_timeout(600);await shot('A_cons_done')
-    await sw();await clear('맞춰보자');await shot('B_cons_notice')
+    await sw();await pg.evaluate('S.c2={}');await clear('맞춰보자');await shot('B_cons_notice')
     await pg.click('.dialog [data-act="go"][data-arg^="thread|"]');await pg.wait_for_timeout(900);await shot('B_constraints')
     await pg.fill('#ca0','스탠드 불빛이 내 침대 쪽으로 오면 깨');await pg.check('#cs0');await pg.fill('#ca1','12시까지는 괜찮아');await pg.check('#cs1')
     await act('consSubmit');await pg.wait_for_timeout(1500)
