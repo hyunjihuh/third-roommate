@@ -40,7 +40,7 @@ async def main():
     await shot('wish_confirm')
     await act('confirmAsk');await pg.wait_for_timeout(700);await shot('wish_sent')
     await sw();await pg.wait_for_timeout(1200);await clear('드라이기');await shot('wish_B_incoming')
-    await act('rCond');await pg.fill('#noteT','7시 반 전엔 문 앞에서 약풍으로 말릴게');await shot('wish_B_cond');await act('rSend');await pg.wait_for_timeout(600)
+    await act('rCond');await pg.fill('#noteT','대신 문 앞 콘센트에 꽂힌 네 충전기 아침엔 빼 줘');await shot('wish_B_cond');await act('rSend');await pg.wait_for_timeout(600)
     await sw();await clear('조건');await shot('wish_A_reply')
     if await has('.dialog [data-act="ack"]'): await act('ack');await pg.wait_for_timeout(900)
     await shot('wish_A_done')
