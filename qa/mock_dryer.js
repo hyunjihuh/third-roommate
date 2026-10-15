@@ -17,7 +17,7 @@ const db={doc:docRef,collection:(p)=>coll(p)};
 window.__prompts=[];
 const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setTimeout(r,window.__delay||60));
  if(p.includes('[C0')&&p.includes('치이카와'))return {draft:"토요일에 같이 치이카와 영화 보러 갈래? 예매는 내가 할게.",clarification:"",missing_fields:[],key_facts:["토요일","치이카와 영화","예매는 하늘"],unsafe:false};
- if(p.includes('[C0'))return p.split('<private_complaint>')[1].split('</private_complaint>')[0].includes('(')?{draft:"평일 아침 7시 반에 드라이기 소리 때문에 깨는 날이 있어. 그 시간엔 욕실에서 말려줄 수 있어?",clarification:"",missing_fields:[],key_facts:["평일 아침","7시 반","드라이기","욕실"],unsafe:false}:{draft:"",clarification:"보통 몇 시쯤이야?",missing_fields:["time"],key_facts:[]};
+ if(p.includes('[C0'))return p.split('<private_complaint>')[1].split('</private_complaint>')[0].includes('(')?{draft:"평일 아침 7시 반쯤 드라이기 소리 때문에 깨는 날이 있어. 그 시간엔 소리를 조금 줄여줄 수 있을까?",clarification:"",missing_fields:[],key_facts:["평일 아침","7시 반","드라이기 소리"],unsafe:false}:{draft:"",clarification:"보통 몇 시쯤이야?",missing_fields:["time"],key_facts:[]};
  if(p.includes('[C1')){const req=p.split('<request>')[1];const g=(p.match(/id: (g_\S+|id\S+)/)||[])[1];
    if(req.includes('치이카와'))return {kind:"request",route:"coordination_needed",evidence_ids:[],missing_fields:[],reason:"같이 하자는 제안이에요."};
    if(req.includes('3시쯤'))return {kind:"permission",action:"술 마신 뒤 새벽 귀가",time:"새벽 3시",duration:"",route:"coordination_needed",evidence_ids:[],missing_fields:[],reason:"늦은 귀가는 정한 카드가 없어서 물어봐야 해요.",unsafe:false};
@@ -40,7 +40,7 @@ const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setT
  if(p.includes('[전달 말투')&&p.includes('3시쯤'))return {text:"혹시 오늘 술을 마시고 새벽 3시쯤 들어가도 괜찮을까? 최대한 조용히 들어갈게. 미안해."};
  if(p.includes('[전달 말투')&&p.includes('치이카와'))return {text:"토요일에 같이 치이카와 영화 보러 갈래? 예매는 내가 할게."};
  if(p.includes('[전달 말투')&&p.includes('약풍'))return {text:"내일 아침 7시에 문 앞 콘센트에서 약풍으로 말릴게."};
- if(p.includes('[전달 말투'))return {text:p.includes('드라이기')?"혹시 평일 아침 7시 반엔 욕실에서 드라이기 써줄 수 있을까? 그때 소리 때문에 깨는 날이 있어.":p.includes('알림일 때')&&p.includes('11시')?"오늘 밤 11시까지 스탠드 켜고 과제할게.":"혹시 오늘 밤 12시 넘어서 스탠드 켜고 1시간쯤 과제해도 괜찮을까?"};
+ if(p.includes('[전달 말투'))return {text:p.includes('드라이기')?"혹시 평일 아침 7시 반쯤엔 드라이기 소리를 조금 줄여줄 수 있을까? 그때 소리 때문에 깨는 날이 있어.":p.includes('알림일 때')&&p.includes('11시')?"오늘 밤 11시까지 스탠드 켜고 과제할게.":"혹시 오늘 밤 12시 넘어서 스탠드 켜고 1시간쯤 과제해도 괜찮을까?"};
  return {};}};
 window.claude={use:async(n)=>n==='db'?db:n==='sample'?sample:n==='downloads'?{save:async()=>{}}:null};
 try{localStorage.clear()}catch(e){}
