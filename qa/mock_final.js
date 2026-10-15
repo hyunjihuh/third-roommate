@@ -44,8 +44,8 @@ const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setT
  if(p.includes('[C7'))return {status:"no_proposal"};
  if(p.includes('[전달 말투')&&p.includes('3시쯤'))return {text:"혹시 오늘 술을 마시고 새벽 3시쯤 들어가도 괜찮을까? 최대한 조용히 들어갈게. 미안해."};
  if(p.includes('[전달 말투')&&p.includes('치이카와'))return {text:"토요일에 같이 치이카와 영화 보러 갈래? 예매는 내가 할게."};
- if(p.includes('[전달 말투')&&p.includes('과외 1시간')&&!p.includes('드라이기 소리'))return {text:"혹시 내일 아침 8시에 방에서 1시간 과외해도 괜찮을까?"};
  if(p.includes('[전달 말투')&&p.includes('스터디룸'))return {text:"다음 주 화요일 아침 8시 과외는 1층 스터디룸에서 할게."};
+ if(p.includes('[전달 말투')&&p.includes('과외 1시간')&&!p.includes('드라이기 소리'))return {text:"혹시 내일 아침 8시에 방에서 1시간 과외해도 괜찮을까?"};
  if(p.includes('[전달 말투')&&p.includes('약풍'))return {text:"내일 아침 7시에 문 앞 콘센트에서 약풍으로 말릴게."};
  if(p.includes('[전달 말투'))return {text:p.includes('드라이기')?"혹시 평일 아침 7시 반쯤엔 드라이기 소리를 조금 줄여줄 수 있을까? 그때 소리 때문에 깨는 날이 있어.":p.includes('알림일 때')&&p.includes('11시')?"오늘 밤 11시까지 스탠드 켜고 과제할게.":"혹시 오늘 밤 12시 넘어서 스탠드 켜고 1시간쯤 과제해도 괜찮을까?"};
  return {};}};
