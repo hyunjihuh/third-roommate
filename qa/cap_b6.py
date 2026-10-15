@@ -42,6 +42,7 @@ async def main():
     await pg.evaluate("(async()=>{const db=await window.claude.use('db');await db.doc(`rooms/${S.code}`).update({status:{A:'in',B:'in'}})})()");await pg.wait_for_timeout(400);await clear()
     await sw();await clear()
     await say('아침마다 알람 좀 줄여줄 수 있어? 가능하면 ㅠㅠ');await pg.wait_for_timeout(500);await shot('f1_b6_confirm')
+    await pg.fill('.dialog textarea','나 아침마다 알람 소리에 계속 깨서 좀 힘들어 ㅠㅠ 가능하면 알람 두 번까지만 맞춰줄 수 있을까?');await pg.wait_for_timeout(300);await shot('f1_b6_edited')
     print('errors',errs[:5])
     await b.close()
 asyncio.run(main())
