@@ -16,6 +16,7 @@ function coll(path,ord,lim){const q={
 const db={doc:docRef,collection:(p)=>coll(p)};
 window.__prompts=[];
 const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setTimeout(r,window.__delay||60));
+ if(p.includes('[C0')&&p.includes('알람'))return {draft:"혹시 아침마다 알람 여러 번 맞춰도 괜찮을까?",clarification:"",missing_fields:[],key_facts:["아침마다","알람"],unsafe:false};
  if(p.includes('[C0')&&p.includes('치이카와'))return {draft:"토요일에 같이 치이카와 영화 보러 갈래? 예매는 내가 할게.",clarification:"",missing_fields:[],key_facts:["토요일","치이카와 영화","예매는 하늘"],unsafe:false};
  if(p.includes('[C0'))return p.split('<private_complaint>')[1].split('</private_complaint>')[0].includes('(')?{draft:"평일 아침 7시 반에 드라이기 소리 때문에 깨는 날이 있어. 그 시간엔 욕실에서 말려줄 수 있어?",clarification:"",missing_fields:[],key_facts:["평일 아침","7시 반","드라이기","욕실"],unsafe:false}:{draft:"",clarification:"보통 몇 시쯤이야?",missing_fields:["time"],key_facts:[]};
  if(p.includes('[C1')){const req=p.split('<request>')[1];const g=(p.match(/id: (g_\S+|id\S+)/)||[])[1];
@@ -25,6 +26,7 @@ const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setT
    if(req.includes('자고 가'))return {kind:"permission",action:"친구 자고 가기",route:"coordination_needed",evidence_ids:["r0"],missing_fields:[],reason:"외부인 숙박은 기숙사 규칙이에요.",unsafe:false};
    if(req.includes('통화 좀'))return {kind:"permission",action:"방에서 통화",time:"지금",duration:"",route:"clarification_needed",evidence_ids:["s4"],cond_check:"unknown",missing_fields:["duration"],clarification:"통화는 몇 분쯤 할 거예요?",reason:"통화 카드 조건이 15분 안이라 길이가 필요해요.",unsafe:false};
    if(req.includes('통화'))return {kind:"permission",action:"방에서 통화",time:"오늘 밤 10시",duration:"10분",route:"covered_by_agreement",evidence_ids:["s4"],cond_check:"met",missing_fields:[],hour:22,minutes:10,reason:"통화 카드에서 바다가 15분 안이면 괜찮다고 했고 10분이에요.",unsafe:false};
+   if(req.includes('알람'))return {kind:"request",route:"coordination_needed",evidence_ids:[],missing_fields:[],reason:"룸메가 하는 일을 바꿔 달라는 부탁이에요."};
    if(req.includes('드라이기'))return {kind:"request",route:"coordination_needed",evidence_ids:[],missing_fields:[],reason:"룸메가 하는 일을 바꿔 달라는 부탁이에요."};
    if(req.includes('11시')&&g)return {kind:"permission",action:"스탠드 켜고 과제",time:"오늘 밤 11시까지",duration:"",route:"covered_by_agreement",evidence_ids:[g],missing_fields:[],hour:23,minutes:0,reason:"같이 만든 카드의 12시 전 범위 안이에요.",unsafe:false};
    return {kind:"permission",action:"스탠드 켜고 과제",time:"오늘 밤 12시 넘어서",duration:"1시간",route:"coordination_needed",evidence_ids:["s2"],missing_fields:[],hour:0,minutes:60,reason:"밤늦게 방에서 공부하기 카드는 바다가 먼저 물어봐 달라고 했어요.",unsafe:false};}
@@ -34,6 +36,7 @@ const sample={json:async(p)=>{window.__prompts.push(p);await new Promise(r=>setT
  if(p.includes('[C6'))return {status:"confirmed",agreement_text:"밤 12시까지는 A가 방에서 스탠드 켜고 과제, 그 뒤엔 동방에서",option_version:1,review_date:"",repeat:true,art:3};
  if(p.includes('[C7'))return {status:"no_proposal"};
  if(p.includes('[전달 말투')&&p.includes('3시쯤'))return {text:"혹시 오늘 술을 마시고 새벽 3시쯤 들어가도 괜찮을까? 최대한 조용히 들어갈게. 미안해."};
+ if(p.includes('[전달 말투')&&p.includes('알람'))return {text:"혹시 아침마다 알람 여러 번 맞춰도 괜찮을까?"};
  if(p.includes('[전달 말투')&&p.includes('치이카와'))return {text:"토요일에 같이 치이카와 영화 보러 갈래? 예매는 내가 할게."};
  if(p.includes('[전달 말투'))return {text:p.includes('드라이기')?"혹시 평일 아침 7시 반엔 욕실에서 드라이기 써줄 수 있을까? 그때 소리 때문에 깨는 날이 있어.":p.includes('알림일 때')&&p.includes('11시')?"오늘 밤 11시까지 스탠드 켜고 과제할게.":"혹시 오늘 밤 12시 넘어서 스탠드 켜고 1시간쯤 과제해도 괜찮을까?"};
  return {};}};
